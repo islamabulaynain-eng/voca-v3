@@ -94,7 +94,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); margin-bottom: 24px; }
 .card-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 
-/* ===== DASHBOARD STATS (FLEXBOX ALIGNMENT) ===== */
+/* ===== DASHBOARD STATS ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-sm); transition: var(--transition); text-align: left; }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--primary-light); }
@@ -168,14 +168,15 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .table-info th { background: var(--info-light); color: var(--info); }
 
 /* ===== PRACTICE & FLASH REVIEW UI ===== */
-.flash-review-container { perspective: 1000px; width: 100%; max-width: 600px; margin: 0 auto; }
-.flash-card { width: 100%; min-height: 400px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; cursor: pointer; position: relative; }
+.flash-review-container { perspective: 1000px; width: 100%; max-width: 650px; margin: 0 auto; }
+.flash-card { width: 100%; min-height: 420px; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; cursor: pointer; position: relative; }
 .flash-card.flipped { transform: rotateY(180deg); }
 .flash-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; border-radius: var(--radius); }
 .flash-front { background: var(--surface); }
 .flash-back { background: var(--surface2); transform: rotateY(180deg); overflow-y: auto; justify-content: flex-start; }
 .flash-word { font-size: 48px; font-weight: 900; color: var(--primary); margin-bottom: 16px; font-family: 'Courier New', monospace; }
 .flash-instruction { position: absolute; bottom: 20px; font-size: 13px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
 .practice-word-display { font-size: 52px; font-weight: 900; color: var(--primary); text-align: center; letter-spacing: 3px; margin: 16px 0; min-height: 64px; font-family: 'Courier New', monospace; }
 .practice-meaning { font-size: 18px; color: var(--text); text-align: center; background: var(--surface2); border-radius: var(--radius); padding: 16px; margin: 12px 0; border: 1px solid var(--border); line-height: 1.6; }
 .practice-hint { font-size: 15px; color: var(--warning); text-align: center; font-style: italic; margin: 8px 0; min-height: 26px; font-weight: 600; }
@@ -191,8 +192,8 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .visual-hook { width: 100%; border-radius: var(--radius-sm); max-height: 220px; object-fit: cover; background: var(--surface2); border: 1.5px solid var(--border); margin-bottom: 16px; }
 .cloze-blank { font-weight: 800; color: var(--primary); border-bottom: 2px dashed var(--primary); padding: 0 4px; }
 
-/* Inline Lexical Container in Practice */
-.inline-lexical { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
+/* Inline Deep Dive Expandable Area */
+.inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
 
 /* ===== MODALS ===== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -204,12 +205,11 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 /* ===== MISC UTILS ===== */
 .progress-bar-wrap { background: var(--surface2); border-radius: 99px; height: 12px; overflow: hidden; margin: 8px 0; border: 1px inset var(--border); }
 .progress-bar-fill { height: 100%; border-radius: 99px; background: var(--primary); transition: width 0.5s ease; }
-.log-window { background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 16px; font-family: 'Courier type', monospace; font-size: 13px; min-height: 120px; max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #334155; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+.log-window { background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 120px; max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #334155; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
 .search-bar { position: relative; flex: 1; }
 .search-bar input { padding-left: 44px; font-size: 16px; }
 .search-bar::before { content: '🔍'; position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; z-index: 1; opacity: 0.5; }
 
-/* ===== BULK IMPORT STYLES ===== */
 .bulk-textarea { width: 100%; min-height: 120px; font-family: monospace; }
 .bulk-word-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .bulk-word-tag { background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 16px; font-size: 13px; }
@@ -328,7 +328,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
     <div id="viewModalContent">
-      <!-- Content injected by JavaScript (Will include new Morphology & Confusables tables) -->
+      <!-- Content injected dynamically via JavaScript -->
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeViewModal()">Close</button>
@@ -488,7 +488,8 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
           <input type="text" id="practiceInput" placeholder="Type the word here..." autocomplete="off" onkeydown="if(event.key==='Enter') checkAnswer()"/>
         </div>
         
-        <div class="hint-buttons">
+        <!-- Pre-Reveal Guidance Hints -->
+        <div class="hint-buttons" id="preRevealHints">
           <button class="btn btn-ghost btn-sm" onclick="showHint('pronounce')">🔊 Pronounce</button>
           <button class="btn btn-ghost btn-sm" onclick="showHint('first')">🔤 1st Letter</button>
           <button class="btn btn-ghost btn-sm" onclick="showHint('syllables')">🔊 Syllables</button>
@@ -496,12 +497,23 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
           <button class="btn btn-ghost btn-sm" onclick="showHint('definition')">📖 Definition</button>
           <button class="btn btn-ghost btn-sm" onclick="showHint('example')">💡 Example</button>
           <button class="btn btn-ghost btn-sm" onclick="showHint('mnemonic')">🧠 Mnemonic</button>
-          <button class="btn btn-ghost btn-sm" onclick="showHint('compare')">🔄 Compare</button>
           <button class="btn btn-warning btn-sm" onclick="revealAnswer()">👁️ Reveal</button>
         </div>
         
+        <!-- Answer feedback -->
         <div id="answerFeedback" style="display:none; margin:16px 0; padding:16px; border-radius:var(--radius); text-align:center;"></div>
+
+        <!-- Post-Reveal Interactive Deep-Dive Buttons -->
+        <div id="postRevealDeepDiveBtns" class="hint-buttons" style="display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('anatomy')">🧩 Anatomy</button>
+          <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('family')">🌳 Word Family</button>
+          <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('confusables')">⚠️ Watch Out</button>
+          <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('similar')">🔄 Similar Words</button>
+        </div>
+
+        <div id="practiceInlineContainer" class="inline-deep-dive"></div>
         
+        <!-- Rating buttons (FSRS) -->
         <div class="rating-buttons" id="ratingButtons" style="display:none;">
           <div style="width:100%; text-align:center; font-size:13px; color:var(--text2); font-weight:700; margin-bottom:4px;">How well did you recall it?</div>
           <button class="rating-btn rating-forgot" onclick="rateWord(1)">😰 Forgot</button>
@@ -532,7 +544,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
             <div class="flash-instruction">Click to Flip</div>
           </div>
           <div class="flash-face flash-back" id="flashBackContent">
-            <!-- Injected dynamically via JS -->
+            <!-- Dynamic back-card content & interactive metadata buttons injected via JS -->
           </div>
         </div>
       </div>
@@ -1132,6 +1144,7 @@ function updateDashboard() {
 function loadSettingsUI() {
   document.getElementById('geminiKeyInput').value = localStorage.getItem('vocabCoach_geminiKey') || '';
   document.getElementById('sheetsUrlInput').value = localStorage.getItem('vocabCoach_sheetsUrl') || '';
+  
   document.getElementById('fsrsRetention').value = fsrsSettings.retention || 90;
   document.getElementById('fsrsMaxInterval').value = fsrsSettings.maxInterval || 36500;
   
@@ -1162,7 +1175,8 @@ function clearApiKey() {
 function saveFsrsSettings() {
   fsrsSettings.retention = parseInt(document.getElementById('fsrsRetention').value) || 90;
   fsrsSettings.maxInterval = parseInt(document.getElementById('fsrsMaxInterval').value) || 36500;
-  saveFsrsToStorage(); showToast('✅ FSRS settings saved!', 'success');
+  saveFsrsToStorage();
+  showToast('✅ FSRS settings saved!', 'success');
 }
 function resetFsrsSettings() {
   fsrsSettings = { retention: 90, maxInterval: 36500 };
@@ -1476,12 +1490,10 @@ function viewWord(id) {
     </div>
     <hr class="divider"/>`;
 
-  // Basic Metadata
   if (w.meaning) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">🇸🇦 Arabic Meaning</div><div style="font-size:20px; font-weight:800; color:var(--text); direction:rtl; text-align:right;">${escHtml(w.meaning)}</div></div>`;
   if (w.pos) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">📝 Part of Speech</div><div style="text-transform:capitalize; font-weight:600;">${escHtml(w.pos)}</div></div>`;
   if (w.definition) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">📖 English Definition</div><div style="color:var(--text); line-height:1.6; font-size:15px;">${escHtml(w.definition)}</div></div>`;
   
-  // Word Anatomy (Morphology)
   if (w.wordAnatomy) {
     html += `
       <div class="lexical-section">
@@ -1498,7 +1510,6 @@ function viewWord(id) {
     html += `<div style="margin-bottom:20px;"><div class="form-label" style="margin-bottom:6px;">🔗 Collocations</div><div class="tag-list">${w.collocations.map(c => `<span class="tag">${escHtml(c)}</span>`).join('')}</div></div>`;
   }
 
-  // Word Family Table
   if (w.wordFamily && Array.isArray(w.wordFamily) && w.wordFamily.length > 0) {
     html += `
       <div class="lexical-section">
@@ -1518,7 +1529,6 @@ function viewWord(id) {
       </div>`;
   }
 
-  // Similar Words (Synonyms/Nuances) Table
   if (w.similarWords && Array.isArray(w.similarWords) && w.similarWords.length > 0) {
     html += `
       <div class="lexical-section">
@@ -1538,7 +1548,6 @@ function viewWord(id) {
       </div>`;
   }
 
-  // Confusables Table
   if (w.confusables && Array.isArray(w.confusables) && w.confusables.length > 0) {
     html += `
       <div class="lexical-section" style="border-color:var(--danger-light); background:var(--danger-light);">
@@ -1685,17 +1694,6 @@ function saveWord() {
   }
   
   saveVocab(); closeWordModal(); renderVocabList(); updateDashboard();
-}
-
-function deleteWord(id) {
-  const w = vocab.find(v => v.id === id);
-  if (!w) return;
-  if (!confirm(`Delete "${w.word}" from your library?`)) return;
-  vocab = vocab.filter(v => v.id !== id);
-  saveVocab(); renderVocabList(); updateDashboard();
-  showToast(`🗑️ "${w.word}" deleted`, 'info');
-  saveActivity({ message: `🗑️ Deleted word: "${w.word}"` });
-  if (typeof syncWordToSheets === 'function') syncWordToSheets({ id }, 'delete');
 }
 
 function practiceOneWord(id) {
@@ -1928,24 +1926,21 @@ function loadPracticeWord() {
     document.getElementById('flashIpa').textContent = word.ipa || '';
     document.getElementById('flashRatingButtons').style.display = 'none';
     
-    let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:16px;">${escHtml(word.meaning)}</div>`;
+    // Interactive Back of Flash Review Card
+    let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:12px;">${escHtml(word.meaning)}</div>`;
     if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
     
-    if (word.confusables && word.confusables.length > 0) {
-      backHtml += `<div style="margin-bottom:16px; width:100%; border:1px solid var(--danger); border-radius:var(--radius-sm); overflow:hidden;">
-        <div style="background:var(--danger-light); color:var(--danger); font-size:12px; font-weight:800; padding:6px 12px; text-transform:uppercase;">⚠️ Watch Out</div>
-        <div style="padding:12px; font-size:13px;">Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em></div>
-      </div>`;
-    }
-    if (word.wordFamily && word.wordFamily.length > 0) {
-      backHtml += `<div style="margin-bottom:16px; width:100%; text-align:left;">
-        <div style="font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase; margin-bottom:4px;">Word Family</div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px;">${word.wordFamily.map(f => `<span class="tag" style="font-size:11px;">${escHtml(f.pos)}: <strong>${escHtml(f.word)}</strong></span>`).join('')}</div>
-      </div>`;
-    }
-    if (word.examples && word.examples.length > 0) {
-      backHtml += `<div style="width:100%; text-align:left; border-left:3px solid var(--primary); padding-left:12px; font-style:italic; font-size:13px; color:var(--text2);">"${escHtml(word.examples[0])}"</div>`;
-    }
+    // Interactive Deep-Dive Toggle Buttons on Review Card Back
+    backHtml += `
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 12px 0; justify-content:center;" onclick="event.stopPropagation()">
+        ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
+        ${word.wordFamily && word.wordFamily.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('family')">🌳 Family</button>` : ''}
+        ${word.confusables && word.confusables.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
+        ${word.similarWords && word.similarWords.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('similar')">🔄 Similar</button>` : ''}
+        ${word.mnemonic ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('mnemonic')">🧠 Tip</button>` : ''}
+      </div>
+      <div id="flashInlineContainer" class="inline-deep-dive" onclick="event.stopPropagation()"></div>`;
+    
     document.getElementById('flashBackContent').innerHTML = backHtml;
     
   } else {
@@ -1980,6 +1975,11 @@ function loadPracticeWord() {
     const input = document.getElementById('practiceInput');
     input.value = ''; input.disabled = false; input.style.borderColor = ''; input.style.background = '';
     
+    // Pre-reveal guidance hints visible, post-reveal deep-dive hidden
+    document.getElementById('preRevealHints').style.display = 'flex';
+    document.getElementById('postRevealDeepDiveBtns').style.display = 'none';
+    document.getElementById('practiceInlineContainer').style.display = 'none';
+    
     document.getElementById('answerFeedback').style.display = 'none';
     document.getElementById('ratingButtons').style.display = 'none';
     document.getElementById('checkBtn').style.display = 'block';
@@ -1994,6 +1994,70 @@ function flipFlashCard() {
     card.classList.add('flipped');
     document.getElementById('flashRatingButtons').style.display = 'flex';
     if (autoPronounce) pronounceWord(practiceSession.words[practiceSession.index].word);
+  }
+}
+
+// Inline Toggles for Flash Review Back Card
+function toggleFlashInline(type) {
+  const word = practiceSession.words[practiceSession.index];
+  const container = document.getElementById('flashInlineContainer');
+  if (!container || !word) return;
+
+  if (container.style.display === 'block' && container.dataset.activeType === type) {
+    container.style.display = 'none';
+    container.dataset.activeType = '';
+    return;
+  }
+
+  let html = '';
+  if (type === 'anatomy' && word.wordAnatomy) {
+    html = `<strong>🧩 Anatomy:</strong> <span style="font-family:monospace;">${escHtml(word.wordAnatomy)}</span>`;
+  } else if (type === 'family' && word.wordFamily && word.wordFamily.length > 0) {
+    html = `<strong>🌳 Word Family:</strong><br>` + word.wordFamily.map(f => `${escHtml(f.pos)}: <strong>${escHtml(f.word)}</strong> (${escHtml(f.meaning)})`).join('<br>');
+  } else if (type === 'confusables' && word.confusables && word.confusables.length > 0) {
+    html = `<strong style="color:var(--danger);">⚠️ Watch Out:</strong> Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em>`;
+  } else if (type === 'similar' && word.similarWords && word.similarWords.length > 0) {
+    html = `<strong>🔄 Similar:</strong> <strong>${escHtml(word.similarWords[0].word)}</strong> (${escHtml(word.similarWords[0].meaning)})<br><em>${escHtml(word.similarWords[0].usage_difference)}</em>`;
+  } else if (type === 'mnemonic' && word.mnemonic) {
+    html = `<strong>🧠 Memory Tip:</strong> 💡 ${escHtml(word.mnemonic)}`;
+  }
+
+  if (html) {
+    container.innerHTML = html;
+    container.style.display = 'block';
+    container.dataset.activeType = type;
+  }
+}
+
+// Inline Toggles for Post-Reveal Active Practice
+function togglePracticeInline(type) {
+  const word = practiceSession.words[practiceSession.index];
+  const container = document.getElementById('practiceInlineContainer');
+  if (!container || !word) return;
+
+  if (container.style.display === 'block' && container.dataset.activeType === type) {
+    container.style.display = 'none';
+    container.dataset.activeType = '';
+    return;
+  }
+
+  let html = '';
+  if (type === 'anatomy' && word.wordAnatomy) {
+    html = `<strong>🧩 Anatomy:</strong> <span style="font-family:monospace;">${escHtml(word.wordAnatomy)}</span>`;
+  } else if (type === 'family' && word.wordFamily && word.wordFamily.length > 0) {
+    html = `<strong>🌳 Word Family:</strong><br>` + word.wordFamily.map(f => `${escHtml(f.pos)}: <strong>${escHtml(f.word)}</strong> (${escHtml(f.meaning)})`).join('<br>');
+  } else if (type === 'confusables' && word.confusables && word.confusables.length > 0) {
+    html = `<strong style="color:var(--danger);">⚠️ Watch Out:</strong> Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em>`;
+  } else if (type === 'similar' && word.similarWords && word.similarWords.length > 0) {
+    html = `<strong>🔄 Similar Words:</strong><br>` + word.similarWords.map(s => `<strong>${escHtml(s.word)}</strong> (${escHtml(s.meaning)}): ${escHtml(s.usage_difference)}`).join('<br>');
+  }
+
+  if (html) {
+    container.innerHTML = html;
+    container.style.display = 'block';
+    container.dataset.activeType = type;
+  } else {
+    showToast('No detailed metadata available for this section.', 'info');
   }
 }
 
@@ -2018,11 +2082,6 @@ function showHint(type) {
     hintEl.innerHTML = `💡 <em>${blanked}</em>`;
   }
   else if (type === 'mnemonic') hintEl.textContent = word.mnemonic ? `🧠 Mnemonic: ${word.mnemonic}` : '🧠 No mnemonic available';
-  else if (type === 'compare') {
-    if (word.similarWords && word.similarWords.length > 0) {
-      hintEl.textContent = `🔄 Similar to: "${word.similarWords[0].word}" (${word.similarWords[0].meaning}) - Diff: ${word.similarWords[0].usage_difference}`;
-    } else hintEl.textContent = '🔄 No similar words available';
-  }
 }
 
 function revealAnswer() {
@@ -2070,7 +2129,7 @@ function showAnswerFeedback(isCorrect, word, revealed) {
   const styleClass = revealed ? 'warning' : (isCorrect ? 'success' : 'danger');
   
   let html = `
-    <div style="background:var(--${styleClass}-light); border:1px solid var(--${styleClass}); border-radius:var(--radius); padding:16px;">
+    <div style="background:var(--${styleClass}-light); border:1.5px solid var(--${styleClass}); border-radius:var(--radius); padding:16px;">
       ${headerHtml}
       <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:8px;">
         <div style="font-size:28px; font-weight:900; color:var(--text); font-family:'Courier New',monospace;">${escHtml(word.word)}</div>
@@ -2089,6 +2148,10 @@ function showAnswerFeedback(isCorrect, word, revealed) {
   feedbackEl.innerHTML = html;
   feedbackEl.style.display = 'block';
   btn.style.display = 'none';
+  
+  // Transition to Post-Reveal Deep Dive buttons
+  document.getElementById('preRevealHints').style.display = 'none';
+  document.getElementById('postRevealDeepDiveBtns').style.display = 'flex';
   document.getElementById('ratingButtons').style.display = 'flex';
 }
 
