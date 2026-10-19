@@ -204,10 +204,18 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 /* ===== MISC UTILS ===== */
 .progress-bar-wrap { background: var(--surface2); border-radius: 99px; height: 12px; overflow: hidden; margin: 8px 0; border: 1px inset var(--border); }
 .progress-bar-fill { height: 100%; border-radius: 99px; background: var(--primary); transition: width 0.5s ease; }
-.log-window { background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 120px; max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #334155; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+.log-window { background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 16px; font-family: 'Courier type', monospace; font-size: 13px; min-height: 120px; max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #334155; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
 .search-bar { position: relative; flex: 1; }
 .search-bar input { padding-left: 44px; font-size: 16px; }
 .search-bar::before { content: '🔍'; position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; z-index: 1; opacity: 0.5; }
+
+/* ===== BULK IMPORT STYLES ===== */
+.bulk-textarea { width: 100%; min-height: 120px; font-family: monospace; }
+.bulk-word-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.bulk-word-tag { background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 16px; font-size: 13px; }
+.bulk-word-tag.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); font-weight: bold; }
+.bulk-word-tag.done { background: var(--success-light); color: var(--success); border-color: var(--success); }
+.bulk-word-tag.skipped { background: var(--border); color: var(--text2); text-decoration: line-through; }
 
 @media (max-width: 768px) {
   .form-grid { grid-template-columns: 1fr; }
@@ -416,7 +424,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       </div>
     </div>
   </div>
-<!-- ========== TAB: PRACTICE & REVIEW ========== -->
+  <!-- ========== TAB: PRACTICE & REVIEW ========== -->
   <div class="tab-panel" id="tab-practice">
     <div class="card" id="practiceSetupCard">
       <div class="card-title">🧠 Practice Session Setup</div>
@@ -1054,7 +1062,7 @@ function clearLog(containerId) {
 }
 function escHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ============================================================
@@ -1124,7 +1132,6 @@ function updateDashboard() {
 function loadSettingsUI() {
   document.getElementById('geminiKeyInput').value = localStorage.getItem('vocabCoach_geminiKey') || '';
   document.getElementById('sheetsUrlInput').value = localStorage.getItem('vocabCoach_sheetsUrl') || '';
-  
   document.getElementById('fsrsRetention').value = fsrsSettings.retention || 90;
   document.getElementById('fsrsMaxInterval').value = fsrsSettings.maxInterval || 36500;
   
@@ -1155,8 +1162,7 @@ function clearApiKey() {
 function saveFsrsSettings() {
   fsrsSettings.retention = parseInt(document.getElementById('fsrsRetention').value) || 90;
   fsrsSettings.maxInterval = parseInt(document.getElementById('fsrsMaxInterval').value) || 36500;
-  saveFsrsToStorage();
-  showToast('✅ FSRS settings saved!', 'success');
+  saveFsrsToStorage(); showToast('✅ FSRS settings saved!', 'success');
 }
 function resetFsrsSettings() {
   fsrsSettings = { retention: 90, maxInterval: 36500 };
@@ -1322,7 +1328,6 @@ function bulkDeleteWords() {
   updateDashboard();
 }
 
-// Bulk AI Re-lookup
 async function bulkReLookupAI() {
   if (!confirm(`Re-run AI lookup for ${selectedWordIds.size} words? This will overwrite their metadata (definitions, meanings, etc.) but keep your SRS progress.`)) return;
   
@@ -1366,7 +1371,6 @@ async function bulkReLookupAI() {
   showToast(`✅ Bulk AI update complete (${successCount}/${idsToProcess.length} succeeded)`, 'success');
 }
 
-
 /* ============================================================
    VOCABULARY LIST RENDERING (Positional Search)
 ============================================================ */
@@ -1377,22 +1381,19 @@ function renderVocabList() {
   
   let list = [...vocab];
   
-  // Filter
   if (filter === 'due')      list = list.filter(w => isDue(w));
   if (filter === 'mastered') list = list.filter(w => w.proficiency === 3);
   if (filter === 'learning') list = list.filter(w => w.proficiency === 1 || w.proficiency === 2);
   if (filter === 'new')      list = list.filter(w => (w.proficiency || 0) === 0);
   
-  // Positional Search (Strictly on Word)
   if (search) {
     list = list.filter(w => w.word.toLowerCase().includes(search));
     list.forEach(w => {
       const idx = w.word.toLowerCase().indexOf(search);
-      w._searchScore = idx === 0 ? 0 : idx; // 0 means it starts with it (highest rank)
+      w._searchScore = idx === 0 ? 0 : idx; 
     });
   }
   
-  // Sort
   if (search) {
     list.sort((a, b) => a._searchScore - b._searchScore || a.word.localeCompare(b.word));
   } else {
@@ -1415,8 +1416,6 @@ function renderVocabList() {
     const profBadge = getProficiencyBadge(w.proficiency); const profLabel = getProficiencyLabel(w.proficiency);
     const dueBadge = due ? `<span class="badge badge-danger">🔥 Due</span>` : `<span class="badge badge-info">📅 ${daysLeft}d</span>`;
     const isChecked = selectedWordIds.has(w.id) ? 'checked' : '';
-    
-    // Spelling Warning Badge
     const spellingWarning = w.commonMisspellings ? `<span class="spelling-warning" title="${escHtml(w.commonMisspellings)}">⚠️ Spelling</span>` : '';
 
     return `
@@ -1447,44 +1446,895 @@ function renderVocabList() {
       </div>`;
   }).join('');
 }
-function wordToRow(w) {
-  return [
-    w.id || '', w.word || '', w.ipa || '', w.meaning || '', w.pos || '',
-    w.definition || '',
-    (w.examples && Array.isArray(w.examples)) ? w.examples.join(' | ') : '',
-    (w.collocations && Array.isArray(w.collocations)) ? w.collocations.join(' | ') : '',
-    w.mnemonic || '',
-    w.wordAnatomy || '', // NEW
-    w.commonMisspellings || '', // NEW
-    JSON.stringify(w.similarWords || []), // NEW
-    JSON.stringify(w.wordFamily || []), // NEW
-    JSON.stringify(w.confusables || []), // NEW
-    w.proficiency || 0,
-    w.reviewCount || 0, w.correctCount || 0, w.wrongCount || 0, w.hintsUsed || 0,
-    w.nextReview || '',
-    w.fsrs_S || '', // NEW
-    w.fsrs_D || '', // NEW
-    w.dateAdded || '', w.lastModified || new Date().toISOString()
-  ];
+/* ============================================================
+   VIEW WORD DETAIL MODAL (W/ LEXICAL CURRICULUM TABLES)
+============================================================ */
+function viewWord(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  viewingWordId = id;
+  const acc = getAccuracy(w);
+  const profBadge = getProficiencyBadge(w.proficiency);
+  const profLabel = getProficiencyLabel(w.proficiency);
+  const due = isDue(w);
+  
+  let html = `
+    <div style="margin-bottom:20px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:36px; font-weight:900; color:var(--primary); font-family:'Courier New',monospace; letter-spacing:-1px;">${escHtml(w.word)}</div>
+            <button class="btn-pronounce" style="font-size:24px;" onclick="pronounceWord('${escHtml(w.word).replace(/'/g, "\\'")}')" title="Pronounce">🔊</button>
+          </div>
+          ${w.ipa ? `<div style="font-size:16px; color:var(--text2); margin-top:4px;">${escHtml(w.ipa)}</div>` : ''}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+          <span class="badge ${profBadge}">${profLabel}</span>
+          <span class="badge ${due?'badge-danger':'badge-info'}">${due ? '🔥 Due Now' : '📅 Next: ' + formatDate(w.nextReview)}</span>
+        </div>
+      </div>
+    </div>
+    <hr class="divider"/>`;
+
+  // Basic Metadata
+  if (w.meaning) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">🇸🇦 Arabic Meaning</div><div style="font-size:20px; font-weight:800; color:var(--text); direction:rtl; text-align:right;">${escHtml(w.meaning)}</div></div>`;
+  if (w.pos) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">📝 Part of Speech</div><div style="text-transform:capitalize; font-weight:600;">${escHtml(w.pos)}</div></div>`;
+  if (w.definition) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">📖 English Definition</div><div style="color:var(--text); line-height:1.6; font-size:15px;">${escHtml(w.definition)}</div></div>`;
+  
+  // Word Anatomy (Morphology)
+  if (w.wordAnatomy) {
+    html += `
+      <div class="lexical-section">
+        <div class="lexical-header">🧩 Word Anatomy (Roots & Affixes)</div>
+        <div style="font-family:monospace; color:var(--primary); font-size:15px; font-weight:700;">${escHtml(w.wordAnatomy)}</div>
+      </div>`;
+  }
+
+  if (w.examples && w.examples.length > 0) {
+    html += `<div style="margin-bottom:20px;"><div class="form-label" style="margin-bottom:6px;">💬 Example Sentences</div>${w.examples.map(ex => `<div style="background:var(--surface2); border-left:4px solid var(--primary); padding:12px 16px; border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin-bottom:8px; font-style:italic; color:var(--text); line-height:1.5;">"${escHtml(ex)}"</div>`).join('')}</div>`;
+  }
+  
+  if (w.collocations && w.collocations.length > 0) {
+    html += `<div style="margin-bottom:20px;"><div class="form-label" style="margin-bottom:6px;">🔗 Collocations</div><div class="tag-list">${w.collocations.map(c => `<span class="tag">${escHtml(c)}</span>`).join('')}</div></div>`;
+  }
+
+  // Word Family Table
+  if (w.wordFamily && Array.isArray(w.wordFamily) && w.wordFamily.length > 0) {
+    html += `
+      <div class="lexical-section">
+        <div class="lexical-header">🌳 Word Family (Derivations)</div>
+        <table class="compare-table table-info" style="table-layout: fixed;">
+          <thead><tr><th style="width:15%;">POS</th><th style="width:35%;">Word</th><th style="width:50%;">Arabic Meaning</th></tr></thead>
+          <tbody>
+            ${w.wordFamily.filter(f => f && typeof f === 'object' && f.word).map(f => `
+              <tr>
+                <td style="font-weight:700; color:var(--text2); text-transform:capitalize; word-wrap:break-word;">${escHtml(f.pos)}</td>
+                <td style="font-weight:700; color:var(--primary); word-wrap:break-word;">${escHtml(f.word)}</td>
+                <td style="direction:rtl; text-align:right; word-wrap:break-word;">${escHtml(f.meaning)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // Similar Words (Synonyms/Nuances) Table
+  if (w.similarWords && Array.isArray(w.similarWords) && w.similarWords.length > 0) {
+    html += `
+      <div class="lexical-section">
+        <div class="lexical-header">🔄 Similar Words & Usage</div>
+        <table class="compare-table" style="table-layout: fixed;">
+          <thead><tr><th style="width:25%;">Word</th><th style="width:25%;">Meaning</th><th style="width:50%;">Usage Difference</th></tr></thead>
+          <tbody>
+            ${w.similarWords.filter(sim => sim && typeof sim === 'object' && sim.word).map(sim => `
+              <tr>
+                <td style="font-weight:700; color:var(--primary); word-wrap:break-word;">${escHtml(sim.word)}</td>
+                <td style="direction:rtl; text-align:right; word-wrap:break-word;">${escHtml(sim.meaning)}</td>
+                <td style="line-height:1.4; word-wrap:break-word;">${escHtml(sim.usage_difference)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // Confusables Table
+  if (w.confusables && Array.isArray(w.confusables) && w.confusables.length > 0) {
+    html += `
+      <div class="lexical-section" style="border-color:var(--danger-light); background:var(--danger-light);">
+        <div class="lexical-header" style="color:var(--danger);">⚠️ Watch Out! (Commonly Confused Words)</div>
+        <table class="compare-table table-danger" style="table-layout: fixed;">
+          <thead><tr><th style="width:25%;">Confused With</th><th style="width:25%;">Its Meaning</th><th style="width:50%;">Why it's confused</th></tr></thead>
+          <tbody>
+            ${w.confusables.filter(c => c && typeof c === 'object' && c.word).map(c => `
+              <tr>
+                <td style="font-weight:800; color:var(--danger); word-wrap:break-word;">${escHtml(c.word)}</td>
+                <td style="direction:rtl; text-align:right; word-wrap:break-word;">${escHtml(c.meaning)}</td>
+                <td style="line-height:1.4; word-wrap:break-word;">${escHtml(c.reason)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  if (w.mnemonic) html += `<div style="margin-bottom:14px;"><div class="form-label" style="margin-bottom:4px;">🧠 Memory Tip</div><div style="background:var(--warning-light); border:1.5px solid var(--warning); border-radius:var(--radius-sm); padding:16px; color:var(--warning); font-weight:600; line-height:1.6;">💡 ${escHtml(w.mnemonic)}</div></div>`;
+  
+  if (w.commonMisspellings) {
+    html += `<div style="margin-bottom:14px; background:var(--danger-light); color:var(--danger); padding:12px; border-radius:var(--radius-sm); border:1px dashed var(--danger); font-size:13px; font-weight:700;">⚠️ Commonly misspelled as: ${escHtml(w.commonMisspellings)}</div>`;
+  }
+
+  html += `
+    <hr class="divider"/>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px,1fr)); gap:12px;">
+      <div style="text-align:center; background:var(--surface2); border-radius:var(--radius-sm); padding:12px; border:1px solid var(--border);"><div style="font-size:22px; font-weight:800; color:var(--primary);">${w.reviewCount || 0}</div><div style="font-size:12px; color:var(--text2); font-weight:600;">Reviews</div></div>
+      <div style="text-align:center; background:var(--surface2); border-radius:var(--radius-sm); padding:12px; border:1px solid var(--border);"><div style="font-size:22px; font-weight:800; color:var(--success);">${w.correctCount || 0}</div><div style="font-size:12px; color:var(--text2); font-weight:600;">Correct</div></div>
+      <div style="text-align:center; background:var(--surface2); border-radius:var(--radius-sm); padding:12px; border:1px solid var(--border);"><div style="font-size:22px; font-weight:800; color:var(--danger);">${w.wrongCount || 0}</div><div style="font-size:12px; color:var(--text2); font-weight:600;">Wrong</div></div>
+      <div style="text-align:center; background:var(--surface2); border-radius:var(--radius-sm); padding:12px; border:1px solid var(--border);"><div style="font-size:22px; font-weight:800; color:var(--warning);">${acc !== null ? acc + '%' : '—'}</div><div style="font-size:12px; color:var(--text2); font-weight:600;">Accuracy</div></div>
+    </div>
+    <div style="margin-top:16px; font-size:12px; color:var(--text2); text-align:right;">Added: ${formatDate(w.dateAdded)}</div>`;
+    
+  document.getElementById('viewModalContent').innerHTML = html;
+  document.getElementById('viewModal').classList.add('open');
 }
 
-function rowToWord(r) {
-  return {
-    id: String(r[0]), word: String(r[1]), ipa: String(r[2]), meaning: String(r[3]),
-    pos: String(r[4]), definition: String(r[5]),
-    examples: r[6] ? String(r[6]).split(' | ').filter(e => e.trim()) : [],
-    collocations: r[7] ? String(r[7]).split(' | ').filter(c => c.trim()) : [],
-    mnemonic: String(r[8]),
-    wordAnatomy: String(r[9]),
-    commonMisspellings: String(r[10]),
-    similarWords: r[11] ? JSON.parse(r[11]) : [],
-    wordFamily: r[12] ? JSON.parse(r[12]) : [],
-    confusables: r[13] ? JSON.parse(r[13]) : [],
-    proficiency: parseInt(r[14]) || 0,
-    reviewCount: parseInt(r[15]) || 0, correctCount: parseInt(r[16]) || 0,
-    wrongCount: parseInt(r[17]) || 0, hintsUsed: parseInt(r[18]) || 0,
-    nextReview: String(r[19]),
-    fsrs_S: parseFloat(r[20]) || null, fsrs_D: parseFloat(r[21]) || null,
-    dateAdded: String(r[22]), lastModified: String(r[23])
-  };
+function closeViewModal() { document.getElementById('viewModal').classList.remove('open'); viewingWordId = null; }
+function editFromView() { closeViewModal(); if (viewingWordId) openEditWordModal(viewingWordId); }
+
+/* ============================================================
+   ADD / EDIT WORD MODAL & AI LOGIC
+============================================================ */
+function openAddWordModal() {
+  editingWordId = null; currentCollocations = []; currentSimilarWords = []; currentWordFamily = []; currentConfusables = []; currentWordAnatomy = ""; currentMisspellings = "";
+  document.getElementById('wordModalTitle').textContent = '➕ Add New Word';
+  document.getElementById('mPronounceBtn').style.display = 'none';
+  clearWordForm();
+  document.getElementById('wordModal').classList.add('open');
+  document.getElementById('lookupStatus').style.display = 'none';
+  setTimeout(() => document.getElementById('mWord').focus(), 100);
 }
+
+function openEditWordModal(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  editingWordId = id; 
+  currentCollocations = [...(w.collocations || [])];
+  currentSimilarWords = (w.similarWords) ? [...w.similarWords] : [];
+  currentWordFamily = (w.wordFamily) ? [...w.wordFamily] : [];
+  currentConfusables = (w.confusables) ? [...w.confusables] : [];
+  currentWordAnatomy = w.wordAnatomy || "";
+  currentMisspellings = w.commonMisspellings || "";
+  
+  document.getElementById('wordModalTitle').textContent = '✏️ Edit Word';
+  document.getElementById('mPronounceBtn').style.display = 'inline-flex';
+  
+  document.getElementById('mWord').value = w.word || '';
+  document.getElementById('mIpa').value = w.ipa || '';
+  document.getElementById('mMeaning').value = w.meaning || '';
+  document.getElementById('mPos').value = w.pos || '';
+  document.getElementById('mDefinition').value = w.definition || '';
+  document.getElementById('mExamples').value = (w.examples || []).join('\n');
+  document.getElementById('mMnemonic').value = w.mnemonic || '';
+  renderCollocTags();
+  
+  document.getElementById('lookupStatus').style.display = 'none';
+  document.getElementById('wordModal').classList.add('open');
+}
+
+function closeWordModal() { document.getElementById('wordModal').classList.remove('open'); editingWordId = null; currentCollocations = []; currentSimilarWords = []; currentWordFamily = []; currentConfusables = []; }
+function clearWordForm() {
+  ['mWord','mIpa','mMeaning','mDefinition','mExamples','mMnemonic','mCollocInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('mPos').value = '';
+  renderCollocTags();
+}
+
+function addCollocation(event) {
+  if (event.key !== 'Enter' && event.type !== 'click') return;
+  const input = document.getElementById('mCollocInput');
+  const val = input.value.trim();
+  if (!val) return;
+  if (currentCollocations.includes(val)) { showToast('Collocation already added', 'warning'); input.value = ''; return; }
+  currentCollocations.push(val); input.value = ''; renderCollocTags();
+}
+
+function removeCollocation(index) { currentCollocations.splice(index, 1); renderCollocTags(); }
+function renderCollocTags() {
+  const container = document.getElementById('mCollocTags');
+  if (!container) return;
+  container.innerHTML = currentCollocations.map((c, i) => `<span class="tag">${escHtml(c)} <span class="tag-remove" onclick="removeCollocation(${i})">×</span></span>`).join('');
+}
+
+let wordInputTimer = null;
+function onWordInput(value) {
+  if (value.trim().length > 0) document.getElementById('mPronounceBtn').style.display = 'inline-flex';
+  else document.getElementById('mPronounceBtn').style.display = 'none';
+  clearTimeout(wordInputTimer);
+  if (value.trim().length < 2) return;
+  wordInputTimer = setTimeout(function() { if (localStorage.getItem('vocabCoach_geminiKey')) triggerLookup(); }, 800);
+}
+
+function saveWord() {
+  const word = document.getElementById('mWord').value.trim();
+  const meaning = document.getElementById('mMeaning').value.trim();
+  if (!word) return (showToast('⚠️ Please enter a word', 'warning'), document.getElementById('mWord').focus());
+  if (!meaning) return (showToast('⚠️ Please enter the Arabic meaning', 'warning'), document.getElementById('mMeaning').focus());
+  
+  const examples = document.getElementById('mExamples').value.split('\n').map(e => e.trim()).filter(e => e.length > 0);
+  const wordData = {
+    word, ipa: document.getElementById('mIpa').value.trim(), meaning,
+    pos: document.getElementById('mPos').value.trim(), definition: document.getElementById('mDefinition').value.trim(),
+    examples, collocations: [...currentCollocations], mnemonic: document.getElementById('mMnemonic').value.trim(),
+    similarWords: [...currentSimilarWords], wordFamily: [...currentWordFamily], confusables: [...currentConfusables],
+    wordAnatomy: currentWordAnatomy, commonMisspellings: currentMisspellings,
+    lastModified: new Date().toISOString()
+  };
+  
+  if (editingWordId) {
+    const idx = vocab.findIndex(v => v.id === editingWordId);
+    if (idx !== -1) {
+      vocab[idx] = { ...vocab[idx], ...wordData };
+      showToast(`✅ "${word}" updated!`, 'success');
+      if (typeof syncWordToSheets === 'function') syncWordToSheets(vocab[idx], 'update');
+    }
+  } else {
+    if (vocab.find(v => v.word.toLowerCase() === word.toLowerCase())) return showToast(`⚠️ "${word}" already exists`, 'warning');
+    const newWord = createWord(wordData);
+    vocab.push(newWord);
+    showToast(`✅ "${word}" added!`, 'success');
+    if (typeof syncWordToSheets === 'function') syncWordToSheets(newWord, 'add');
+  }
+  
+  saveVocab(); closeWordModal(); renderVocabList(); updateDashboard();
+}
+
+function deleteWord(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  if (!confirm(`Delete "${w.word}" from your library?`)) return;
+  vocab = vocab.filter(v => v.id !== id);
+  saveVocab(); renderVocabList(); updateDashboard();
+  showToast(`🗑️ "${w.word}" deleted`, 'info');
+  saveActivity({ message: `🗑️ Deleted word: "${w.word}"` });
+  if (typeof syncWordToSheets === 'function') syncWordToSheets({ id }, 'delete');
+}
+
+function practiceOneWord(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  practiceSession = { words: [w], index: 0, score: 0, hintsUsed: 0, correct: 0, wrong: 0, mode: 'active' };
+  showTab('practice');
+  document.getElementById('practiceSetupCard').style.display = 'none';
+  document.getElementById('practiceCompleteCard').style.display = 'none';
+  document.getElementById('flashReviewCard').style.display = 'none';
+  document.getElementById('practiceSessionCard').style.display = 'block';
+  loadPracticeWord();
+}
+
+/* ============================================================
+   GEMINI AI LOOKUP ENGINE (CURRICULUM SCHEMA)
+============================================================ */
+const GEMINI_MODEL_BLACKLIST = ['tts', 'vision', 'image', 'embedding', 'embed', 'aqa', 'retrieval', 'answer', 'bison', 'gecko', 'palm', 'code', 'preview', 'exp', 'it-'];
+const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+
+function isModelAllowed(modelName) { return !GEMINI_MODEL_BLACKLIST.some(bad => modelName.toLowerCase().includes(bad)); }
+function scoreModel(modelName) {
+  let score = 0; const name = modelName.toLowerCase();
+  if (name.includes('flash')) score += 30; if (name.includes('lite')) score += 10;
+  if (name.includes('1.5')) score += 5; if (name.includes('2.0')) score += 15;
+  if (name.includes('pro')) score -= 10; if (name.includes('preview')) score -= 20;
+  return score;
+}
+
+async function fetchAvailableGeminiModels(apiKey) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.models) return null;
+    return data.models.map(m => m.name.replace('models/', '')).filter(isModelAllowed).sort((a, b) => scoreModel(b) - scoreModel(a));
+  } catch (e) { return null; }
+}
+
+async function callGemini(apiKey, prompt, logId) {
+  const log = logId ? (msg, type) => logLine(logId, msg, type) : () => {};
+  let models = await fetchAvailableGeminiModels(apiKey) || [...GEMINI_FALLBACK_MODELS];
+  
+  const aiSchema = {
+    type: "OBJECT",
+    properties: {
+      word: { type: "STRING" }, ipa: { type: "STRING" }, pos: { type: "STRING" }, meaning: { type: "STRING" }, definition: { type: "STRING" },
+      examples: { type: "ARRAY", items: { type: "STRING" } }, collocations: { type: "ARRAY", items: { type: "STRING" } }, mnemonic: { type: "STRING" },
+      wordAnatomy: { type: "STRING" }, commonMisspellings: { type: "STRING" },
+      wordFamily: { type: "ARRAY", items: { type: "OBJECT", properties: { pos: { type: "STRING" }, word: { type: "STRING" }, meaning: { type: "STRING" } }, required: ["pos", "word", "meaning"] } },
+      confusables: { type: "ARRAY", items: { type: "OBJECT", properties: { word: { type: "STRING" }, meaning: { type: "STRING" }, reason: { type: "STRING" } }, required: ["word", "meaning", "reason"] } },
+      similarWords: { type: "ARRAY", items: { type: "OBJECT", properties: { word: { type: "STRING" }, meaning: { type: "STRING" }, usage_difference: { type: "STRING" } }, required: ["word", "meaning", "usage_difference"] } }
+    },
+    required: ["word", "ipa", "pos", "meaning", "definition", "examples", "collocations", "mnemonic", "wordAnatomy", "commonMisspellings", "wordFamily", "confusables", "similarWords"]
+  };
+
+  for (let model of models) {
+    try {
+      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 1500, response_mime_type: "application/json", response_schema: aiSchema } })
+      });
+      clearTimeout(timer); const data = await res.json();
+      if (!res.ok) continue;
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return { text, model };
+    } catch (err) { continue; }
+  }
+  throw new Error('All Gemini models failed.');
+}
+
+function buildLookupPrompt(word) {
+  return `You are an expert linguistics curriculum designer. Generate comprehensive lexical metadata for the English word: "${word}". Include its morphology (word anatomy), derivations (word family), dangerous confusables (false friends/similar looking words), common misspellings, synonyms with usage nuances, and Arabic translations. Return accurate data strictly conforming to the schema.`;
+}
+
+async function lookupWithFallback(word, logId) {
+  const log = logId ? (msg, type) => logLine(logId, msg, type) : () => {};
+  const result = {};
+  
+  try {
+    const res = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&md=dpsr&max=1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0 && data[0].defs && data[0].defs.length > 0) {
+        const defParts = data[0].defs[0].split('\t');
+        result.pos = defParts[0] || '';
+        result.definition = defParts[1] || '';
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const res2 = await fetch(`https://api.datamuse.com/words?lc=${encodeURIComponent(word)}&max=6`);
+    if (res2.ok) {
+      const data2 = await res2.json();
+      if (data2 && data2.length > 0) result.collocations = data2.slice(0, 5).map(w => `${word} ${w.word}`);
+    }
+  } catch (e) {}
+
+  try {
+    const res3 = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|ar`);
+    if (res3.ok) {
+      const data3 = await res3.json();
+      const translation = data3?.responseData?.translatedText;
+      if (translation && translation !== word) result.meaning = translation;
+    }
+  } catch (e) {}
+  
+  return result;
+}
+
+async function triggerLookup(bulkWord = null) {
+  const isBulk = !!bulkWord;
+  const word = isBulk ? bulkWord : document.getElementById('mWord').value.trim();
+  if (!word) return showToast('Please enter a word first', 'warning');
+  
+  const apiKey = localStorage.getItem('vocabCoach_geminiKey') || '';
+  const lookupBtn = isBulk ? null : document.getElementById('lookupBtn');
+  const statusDiv = isBulk ? document.getElementById('bulkLookupStatus') : document.getElementById('lookupStatus');
+  const logId = isBulk ? 'bulkLookupLog' : 'lookupLog';
+  
+  statusDiv.style.display = 'block'; clearLog(logId);
+  if (lookupBtn) { lookupBtn.disabled = true; lookupBtn.textContent = '⏳ Analyzing...'; }
+  logLine(logId, `Starting deep linguistic lookup for: "${word}"`, 'info');
+  
+  let result = {};
+  let usedGemini = false;
+  if (apiKey) {
+    try {
+      const prompt = buildLookupPrompt(word);
+      const { text, model } = await callGemini(apiKey, prompt, logId);
+      result = JSON.parse(text); 
+      usedGemini = true;
+      logLine(logId, `✅ Deep lookup complete using ${model}`, 'ok');
+    } catch (err) { logLine(logId, `Gemini failed: ${err.message}`, 'warn'); }
+  }
+  
+  if (!usedGemini) {
+    logLine(logId, '⚠️ Falling back to basic Datamuse lookup...', 'warn');
+    result = await lookupWithFallback(word, logId);
+  }
+  
+  const prefix = isBulk ? 'b' : 'm';
+  if (result.ipa)        document.getElementById(prefix+'Ipa').value        = result.ipa;
+  if (result.meaning)    document.getElementById(prefix+'Meaning').value    = result.meaning;
+  if (result.pos)        document.getElementById(prefix+'Pos').value        = result.pos;
+  if (result.definition) document.getElementById(prefix+'Definition').value = result.definition;
+  if (result.mnemonic)   document.getElementById(prefix+'Mnemonic').value   = result.mnemonic;
+  
+  if (result.similarWords) currentSimilarWords = result.similarWords;
+  if (result.wordFamily) currentWordFamily = result.wordFamily;
+  if (result.confusables) currentConfusables = result.confusables;
+  if (result.wordAnatomy) currentWordAnatomy = result.wordAnatomy;
+  if (result.commonMisspellings) currentMisspellings = result.commonMisspellings;
+  
+  if (result.examples && result.examples.length > 0) {
+    document.getElementById(prefix+'Examples').value = result.examples.filter(e => e && e.trim()).join('\n');
+  }
+  if (!isBulk && result.collocations && result.collocations.length > 0) {
+    result.collocations.filter(c => c && c.trim()).forEach(c => { if (!currentCollocations.includes(c.trim())) currentCollocations.push(c.trim()); });
+    renderCollocTags();
+  }
+  
+  if (lookupBtn) { lookupBtn.disabled = false; lookupBtn.textContent = '🤖 AI Lookup'; }
+  return result;
+}
+
+async function testApiKey() {
+  const key = document.getElementById('geminiKeyInput').value.trim();
+  if (!key) return showToast('Please enter an API key to test', 'warning');
+  document.getElementById('keyTestArea').style.display = 'block'; clearLog('keyTestLog');
+  logLine('keyTestLog', '🔑 Testing API key...', 'info');
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (res.ok) { logLine('keyTestLog', '✅ Key is valid and working!', 'ok'); showToast('✅ API key is valid!', 'success'); } 
+    else { logLine('keyTestLog', `❌ Invalid API key. HTTP ${res.status}`, 'err'); }
+  } catch(e) { logLine('keyTestLog', `❌ Network Error: ${e.message}`, 'err'); }
+}
+
+/* ============================================================
+   PRACTICE & REVIEW SESSIONS
+============================================================ */
+function startPractice(mode = 'active') {
+  const type  = document.getElementById('practiceType').value;
+  const count = document.getElementById('practiceCount').value;
+  let pool = [];
+  
+  if (type === 'due')  pool = vocab.filter(w => isDue(w));
+  if (type === 'all')  pool = [...vocab];
+  if (type === 'new')  pool = vocab.filter(w => (w.proficiency || 0) === 0);
+  if (type === 'weak') {
+    pool = vocab.filter(w => (w.reviewCount || 0) > 0).sort((a, b) => (getAccuracy(a) ?? 101) - (getAccuracy(b) ?? 101));
+    if (pool.length === 0) pool = [...vocab];
+  }
+  
+  if (pool.length === 0) return showToast('⚠️ No words available for this session type.', 'warning');
+  pool = shuffleArray(pool);
+  if (count !== 'all') pool = pool.slice(0, Math.min(parseInt(count), pool.length));
+  
+  practiceSession = { words: pool, index: 0, score: 0, hintsUsed: 0, correct: 0, wrong: 0, startTime: Date.now(), mode: mode };
+  
+  document.getElementById('practiceSetupCard').style.display = 'none';
+  document.getElementById('practiceCompleteCard').style.display = 'none';
+  
+  if (mode === 'flash') {
+    document.getElementById('practiceSessionCard').style.display = 'none';
+    document.getElementById('flashReviewCard').style.display = 'block';
+  } else {
+    document.getElementById('flashReviewCard').style.display = 'none';
+    document.getElementById('practiceSessionCard').style.display = 'block';
+  }
+  
+  loadPracticeWord(); saveStreak();
+}
+
+function loadPracticeWord() {
+  const session = practiceSession;
+  const word = session.words[session.index];
+  if (!word) return;
+  
+  const total = session.words.length;
+  const current = session.index + 1;
+  
+  if (session.mode === 'flash') {
+    document.getElementById('flashProgress').textContent = `Word ${current} of ${total}`;
+    document.getElementById('flashProgressBar').style.width = Math.round(((current - 1) / total) * 100) + '%';
+    document.getElementById('flashCardInner').classList.remove('flipped');
+    document.getElementById('flashWord').textContent = word.word;
+    document.getElementById('flashIpa').textContent = word.ipa || '';
+    document.getElementById('flashRatingButtons').style.display = 'none';
+    
+    let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:16px;">${escHtml(word.meaning)}</div>`;
+    if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
+    
+    if (word.confusables && word.confusables.length > 0) {
+      backHtml += `<div style="margin-bottom:16px; width:100%; border:1px solid var(--danger); border-radius:var(--radius-sm); overflow:hidden;">
+        <div style="background:var(--danger-light); color:var(--danger); font-size:12px; font-weight:800; padding:6px 12px; text-transform:uppercase;">⚠️ Watch Out</div>
+        <div style="padding:12px; font-size:13px;">Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em></div>
+      </div>`;
+    }
+    if (word.wordFamily && word.wordFamily.length > 0) {
+      backHtml += `<div style="margin-bottom:16px; width:100%; text-align:left;">
+        <div style="font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase; margin-bottom:4px;">Word Family</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">${word.wordFamily.map(f => `<span class="tag" style="font-size:11px;">${escHtml(f.pos)}: <strong>${escHtml(f.word)}</strong></span>`).join('')}</div>
+      </div>`;
+    }
+    if (word.examples && word.examples.length > 0) {
+      backHtml += `<div style="width:100%; text-align:left; border-left:3px solid var(--primary); padding-left:12px; font-style:italic; font-size:13px; color:var(--text2);">"${escHtml(word.examples[0])}"</div>`;
+    }
+    document.getElementById('flashBackContent').innerHTML = backHtml;
+    
+  } else {
+    document.getElementById('practiceProgress').textContent = `Word ${current} of ${total}`;
+    document.getElementById('practiceProgressBar').style.width = Math.round(((current - 1) / total) * 100) + '%';
+    document.getElementById('practiceSessionScore').textContent = `Score: ${session.score}`;
+    
+    const visualEl = document.getElementById('practiceVisual');
+    if (document.getElementById('enableVisuals').checked) {
+      visualEl.style.display = 'block';
+      visualEl.src = 'https://image.pollinations.ai/prompt/' + encodeURIComponent('vocabulary word concept ' + word.word) + '?width=800&height=300&nologo=true';
+    } else { visualEl.style.display = 'none'; }
+    
+    const meaningEl = document.getElementById('practiceMeaning');
+    const clozeEl = document.getElementById('practiceCloze');
+    const promptLabel = document.getElementById('practicePromptLabel');
+    
+    const useCloze = document.getElementById('enableCloze').checked && word.examples && word.examples.length > 0 && Math.random() > 0.5;
+    if (useCloze) {
+      const ex = word.examples[Math.floor(Math.random() * word.examples.length)];
+      const clozeStr = ex.replace(new RegExp(word.word, 'gi'), '<span class="cloze-blank">______</span>');
+      meaningEl.style.display = 'none'; clozeEl.style.display = 'block';
+      clozeEl.innerHTML = clozeStr; promptLabel.textContent = "Fill in the blank:";
+    } else {
+      meaningEl.style.display = 'block'; clozeEl.style.display = 'none';
+      meaningEl.textContent = word.meaning || '(no meaning set)'; promptLabel.textContent = "What word means:";
+    }
+    
+    document.getElementById('practicePos').textContent = ''; 
+    document.getElementById('practiceHintDisplay').textContent = '';
+    
+    const input = document.getElementById('practiceInput');
+    input.value = ''; input.disabled = false; input.style.borderColor = ''; input.style.background = '';
+    
+    document.getElementById('answerFeedback').style.display = 'none';
+    document.getElementById('ratingButtons').style.display = 'none';
+    document.getElementById('checkBtn').style.display = 'block';
+    document.getElementById('checkBtn').disabled = false;
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function flipFlashCard() {
+  const card = document.getElementById('flashCardInner');
+  if (!card.classList.contains('flipped')) {
+    card.classList.add('flipped');
+    document.getElementById('flashRatingButtons').style.display = 'flex';
+    if (autoPronounce) pronounceWord(practiceSession.words[practiceSession.index].word);
+  }
+}
+
+function showHint(type) {
+  const word = practiceSession.words[practiceSession.index];
+  if (!word) return;
+  practiceSession.hintsUsed++;
+  const v = vocab.find(v => v.id === word.id);
+  if (v) v.hintsUsed = (v.hintsUsed || 0) + 1;
+  const hintEl = document.getElementById('practiceHintDisplay');
+  
+  if (type === 'pronounce') { pronounceWord(word.word); hintEl.textContent = '🔊 Playing pronunciation...'; }
+  else if (type === 'first') hintEl.textContent = `🔤 First letter: "${word.word[0].toUpperCase()}"`;
+  else if (type === 'syllables') hintEl.textContent = word.ipa ? `🔊 IPA chunks: ${word.ipa.replace(/[ˈˌ]/g, ' · ').trim()}` : `🔊 Rough syllables: ${word.word.replace(/([aeiou]+)/gi, '$1·').replace(/·$/, '')}`;
+  else if (type === 'ipa') hintEl.textContent = word.ipa ? `📢 IPA: ${word.ipa}` : '📢 No IPA available';
+  else if (type === 'pos') { document.getElementById('practicePos').textContent = word.pos ? `[ ${word.pos} ]` : ''; hintEl.textContent = word.pos ? `📝 Part of Speech: ${word.pos}` : '📝 No Part of Speech available'; }
+  else if (type === 'definition') hintEl.textContent = word.definition ? `📖 Definition: ${word.definition}` : '📖 No definition available';
+  else if (type === 'example') {
+    if (!word.examples || word.examples.length === 0) return hintEl.textContent = '💡 No example sentences available';
+    const ex = word.examples[Math.floor(Math.random() * word.examples.length)];
+    const blanked = ex.replace(new RegExp(word.word, 'gi'), '_'.repeat(word.word.length));
+    hintEl.innerHTML = `💡 <em>${blanked}</em>`;
+  }
+  else if (type === 'mnemonic') hintEl.textContent = word.mnemonic ? `🧠 Mnemonic: ${word.mnemonic}` : '🧠 No mnemonic available';
+  else if (type === 'compare') {
+    if (word.similarWords && word.similarWords.length > 0) {
+      hintEl.textContent = `🔄 Similar to: "${word.similarWords[0].word}" (${word.similarWords[0].meaning}) - Diff: ${word.similarWords[0].usage_difference}`;
+    } else hintEl.textContent = '🔄 No similar words available';
+  }
+}
+
+function revealAnswer() {
+  const word = practiceSession.words[practiceSession.index];
+  const input = document.getElementById('practiceInput');
+  input.value = word.word; input.disabled = true;
+  input.style.borderColor = 'var(--warning)'; input.style.background = 'var(--warning-light)';
+  document.getElementById('practiceHintDisplay').textContent = `👁️ Answer revealed: "${word.word}"`;
+  showAnswerFeedback(false, word, true);
+  if (autoPronounce) pronounceWord(word.word);
+}
+
+function checkAnswer() {
+  const word = practiceSession.words[practiceSession.index];
+  const input = document.getElementById('practiceInput');
+  const userAns = input.value.trim().toLowerCase();
+  const correct = word.word.toLowerCase();
+  
+  if (!userAns) return (showToast('Please type your answer first', 'warning'), input.focus());
+  
+  const isCorrect = userAns === correct || levenshtein(userAns, correct) <= Math.floor(correct.length * 0.15);
+  input.disabled = true;
+  
+  if (isCorrect) {
+    input.style.borderColor = 'var(--success)'; input.style.background = 'var(--success-light)';
+    practiceSession.score += 10; practiceSession.correct++;
+    document.getElementById('practiceSessionScore').textContent = `Score: ${practiceSession.score}`;
+  } else {
+    input.style.borderColor = 'var(--danger)'; input.style.background = 'var(--danger-light)';
+    practiceSession.wrong++;
+  }
+  
+  showAnswerFeedback(isCorrect, word, false);
+  if (autoPronounce) pronounceWord(word.word);
+}
+
+function showAnswerFeedback(isCorrect, word, revealed) {
+  const feedbackEl = document.getElementById('answerFeedback');
+  const btn = document.getElementById('checkBtn');
+  
+  let headerHtml = revealed ? `<div style="font-size:18px; font-weight:800; color:var(--warning);">👁️ Answer Revealed</div>` 
+    : (isCorrect ? `<div style="font-size:18px; font-weight:800; color:var(--success);">✅ Correct! +10 points</div>` 
+    : `<div style="font-size:18px; font-weight:800; color:var(--danger);">❌ Not quite! Correct answer:</div>`);
+  
+  const styleClass = revealed ? 'warning' : (isCorrect ? 'success' : 'danger');
+  
+  let html = `
+    <div style="background:var(--${styleClass}-light); border:1px solid var(--${styleClass}); border-radius:var(--radius); padding:16px;">
+      ${headerHtml}
+      <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:8px;">
+        <div style="font-size:28px; font-weight:900; color:var(--text); font-family:'Courier New',monospace;">${escHtml(word.word)}</div>
+        <button class="btn-pronounce" onclick="pronounceWord('${escHtml(word.word).replace(/'/g, "\\'")}')" title="Pronounce">🔊</button>
+      </div>
+      ${word.ipa ? `<div style="color:var(--text2); margin-bottom:6px;">${escHtml(word.ipa)}</div>` : ''}
+    </div>`;
+    
+  if (!isCorrect && !revealed && word.confusables && word.confusables.length > 0) {
+    html += `<div style="margin-top:12px; background:var(--danger-light); color:var(--danger); border:1px solid var(--danger); padding:12px; border-radius:var(--radius-sm); text-align:left; font-size:13px;">
+      <strong>⚠️ Did you confuse it with ${escHtml(word.confusables[0].word)}?</strong><br>
+      That means <em>${escHtml(word.confusables[0].meaning)}</em>. ${escHtml(word.confusables[0].reason)}
+    </div>`;
+  }
+  
+  feedbackEl.innerHTML = html;
+  feedbackEl.style.display = 'block';
+  btn.style.display = 'none';
+  document.getElementById('ratingButtons').style.display = 'flex';
+}
+
+function rateWord(rating) {
+  const word = practiceSession.words[practiceSession.index];
+  const v = vocab.find(v => v.id === word.id);
+  if (v) { applyFSRS(v, rating); saveVocab(); }
+  saveActivity({ message: `🧠 Practiced "${word.word}" — rated ${['Forgot','Hard','Good','Easy'][rating-1]}` });
+  practiceSession.index++;
+  if (practiceSession.index >= practiceSession.words.length) endPracticeSession();
+  else loadPracticeWord();
+}
+
+function rateFlashWord(rating, event) {
+  event.stopPropagation(); 
+  rateWord(rating); 
+}
+
+function endPracticeSession() {
+  const session = practiceSession;
+  const accuracy = session.words.length > 0 ? Math.round((session.correct / session.words.length) * 100) : 0;
+  
+  document.getElementById('practiceSessionCard').style.display = 'none';
+  document.getElementById('flashReviewCard').style.display = 'none';
+  document.getElementById('practiceCompleteCard').style.display = 'block';
+  
+  document.getElementById('sessionSummary').innerHTML = session.mode === 'active' ? `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px; margin:20px 0;">
+      <div style="background:var(--surface2); padding:16px; border-radius:var(--radius); border:1px solid var(--border);"><div style="font-size:28px; font-weight:800; color:var(--primary);">${session.score}</div><div style="font-size:12px; color:var(--text2);">Score</div></div>
+      <div style="background:var(--success-light); padding:16px; border-radius:var(--radius); border:1px solid var(--success);"><div style="font-size:28px; font-weight:800; color:var(--success);">${session.correct}</div><div style="font-size:12px; color:var(--text2);">Correct</div></div>
+      <div style="background:var(--danger-light); padding:16px; border-radius:var(--radius); border:1px solid var(--danger);"><div style="font-size:28px; font-weight:800; color:var(--danger);">${session.wrong}</div><div style="font-size:12px; color:var(--text2);">Wrong</div></div>
+      <div style="background:var(--info-light); padding:16px; border-radius:var(--radius); border:1px solid var(--info);"><div style="font-size:28px; font-weight:800; color:var(--info);">${accuracy}%</div><div style="font-size:12px; color:var(--text2);">Accuracy</div></div>
+    </div>` : `<p style="font-size:18px; margin: 20px 0;">Reviewed ${session.index} words.</p>`;
+  
+  saveActivity({ message: `🎯 Completed ${session.mode} session: ${session.index} words reviewed.` });
+  updateDashboard();
+}
+
+function shuffleArray(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function levenshtein(a, b) {
+  const m = a.length, n = b.length; const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i===0 ? j : j===0 ? i : 0));
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+/* ============================================================
+   BULK IMPORT PROCESSOR
+============================================================ */
+let bulkQueue = [];
+let bulkIndex = 0;
+let bulkStats = { added: 0, skipped: 0 };
+let isBulkRunning = false;
+
+function startBulkImport() {
+  const rawText = document.getElementById('bulkPasteArea').value;
+  if (!rawText.trim()) return showToast('Please paste some words first.', 'warning');
+  const rawWords = rawText.split(/[\n,;]+/).map(w => w.trim()).filter(w => w.length > 0);
+  bulkQueue = [...new Set(rawWords)];
+  if (bulkQueue.length === 0) return showToast('No valid words found.', 'warning');
+  
+  bulkIndex = 0; bulkStats = { added: 0, skipped: 0 }; isBulkRunning = true;
+  document.getElementById('bulkInputCard').style.display = 'none';
+  document.getElementById('bulkSummaryCard').style.display = 'none';
+  document.getElementById('bulkProcessCard').style.display = 'block';
+  
+  renderBulkQueue(); processNextBulkWord();
+}
+
+function renderBulkQueue() {
+  const container = document.getElementById('bulkWordQueue');
+  container.innerHTML = bulkQueue.map((w, i) => {
+    let className = 'bulk-word-tag';
+    if (i === bulkIndex) className += ' active';
+    else if (i < bulkIndex) className += ' done';
+    return `<span class="${className}" id="bulkTag_${i}">${escHtml(w)}</span>`;
+  }).join('');
+}
+
+async function processNextBulkWord() {
+  if (!isBulkRunning) return;
+  if (bulkIndex >= bulkQueue.length) return finishBulkImport();
+  
+  const currentWord = bulkQueue[bulkIndex];
+  renderBulkQueue();
+  
+  document.getElementById('bulkProgressText').textContent = `Word ${bulkIndex + 1} of ${bulkQueue.length}`;
+  document.getElementById('bulkProgressBar').style.width = Math.round((bulkIndex / bulkQueue.length) * 100) + '%';
+  document.getElementById('bulkCurrentWordDisplay').textContent = currentWord;
+  
+  const editor = document.getElementById('bulkEditorArea');
+  editor.style.opacity = '0.5'; editor.style.pointerEvents = 'none';
+  
+  clearWordForm();
+  ['bWord','bIpa','bMeaning','bDefinition','bExamples','bMnemonic'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
+  document.getElementById('bPos').value = '';
+  document.getElementById('bWord').value = currentWord;
+  
+  currentSimilarWords = []; currentWordFamily = []; currentConfusables = []; currentWordAnatomy = ""; currentMisspellings = "";
+  
+  const exists = vocab.find(v => v.word.toLowerCase() === currentWord.toLowerCase());
+  if (exists) showToast(`"${currentWord}" is already in your vocabulary.`, 'info');
+  
+  try { await triggerLookup(currentWord); } 
+  catch (err) { showToast(`Lookup failed for "${currentWord}"`, 'error'); }
+  
+  editor.style.opacity = '1'; editor.style.pointerEvents = 'auto';
+  document.getElementById('bMeaning').focus();
+}
+
+function confirmBulkWord() {
+  if (!isBulkRunning) return;
+  const word = document.getElementById('bWord').value.trim();
+  const meaning = document.getElementById('bMeaning').value.trim();
+  if (!word || !meaning) return showToast('Word and Meaning are required', 'warning');
+  
+  const wordData = {
+    word, ipa: document.getElementById('bIpa').value.trim(), meaning,
+    pos: document.getElementById('bPos').value.trim(), definition: document.getElementById('bDefinition').value.trim(),
+    examples: document.getElementById('bExamples').value.split('\n').filter(e => e.trim()),
+    collocations: [], mnemonic: document.getElementById('bMnemonic').value.trim(),
+    similarWords: [...currentSimilarWords], wordFamily: [...currentWordFamily], confusables: [...currentConfusables],
+    wordAnatomy: currentWordAnatomy, commonMisspellings: currentMisspellings, lastModified: new Date().toISOString()
+  };
+  
+  const existingIdx = vocab.findIndex(v => v.word.toLowerCase() === word.toLowerCase());
+  if (existingIdx !== -1) { vocab[existingIdx] = { ...vocab[existingIdx], ...wordData }; if (typeof syncWordToSheets === 'function') syncWordToSheets(vocab[existingIdx], 'update'); } 
+  else { const newWord = createWord(wordData); vocab.push(newWord); if (typeof syncWordToSheets === 'function') syncWordToSheets(newWord, 'add'); }
+  
+  saveVocab(); bulkStats.added++;
+  const tag = document.getElementById(`bulkTag_${bulkIndex}`);
+  if (tag) tag.className = 'bulk-word-tag done';
+  bulkIndex++; processNextBulkWord();
+}
+
+function skipBulkWord() {
+  if (!isBulkRunning) return;
+  bulkStats.skipped++;
+  const tag = document.getElementById(`bulkTag_${bulkIndex}`);
+  if (tag) tag.className = 'bulk-word-tag skipped';
+  bulkIndex++; processNextBulkWord();
+}
+
+function stopBulkImport() { isBulkRunning = false; finishBulkImport(); }
+function finishBulkImport() {
+  isBulkRunning = false;
+  document.getElementById('bulkProcessCard').style.display = 'none';
+  document.getElementById('bulkSummaryCard').style.display = 'block';
+  document.getElementById('bulkSummaryText').innerHTML = `<strong>${bulkStats.added}</strong> words saved.<br><strong>${bulkStats.skipped}</strong> skipped.`;
+  renderVocabList(); updateDashboard();
+}
+
+function resetBulkImport() {
+  document.getElementById('bulkPasteArea').value = '';
+  document.getElementById('bulkSummaryCard').style.display = 'none';
+  document.getElementById('bulkInputCard').style.display = 'block';
+}
+
+/* ============================================================
+   GOOGLE SHEETS SYNC LOGIC
+============================================================ */
+let sheetsUrl = '';
+
+function setSyncStatus(status) {
+  const indicator = document.getElementById('syncIndicator');
+  if (!sheetsUrl) { indicator.style.display = 'none'; return; }
+  indicator.style.display = 'inline-flex'; indicator.className = `sync-indicator ${status}`;
+  
+  if (status === 'synced') indicator.innerHTML = '🟢 Synced';
+  else if (status === 'syncing') indicator.innerHTML = '🔄 Syncing...';
+  else if (status === 'failed') indicator.innerHTML = '🔴 Sync Failed — Retry';
+}
+
+function saveSheetsUrl() {
+  const url = document.getElementById('sheetsUrlInput').value.trim();
+  if (!url) return showToast('Please enter a valid URL', 'warning');
+  localStorage.setItem('vocabCoach_sheetsUrl', url);
+  sheetsUrl = url; showToast('Google Sheets URL saved!', 'success'); forceSync();
+}
+
+function clearSheetsUrl() {
+  localStorage.removeItem('vocabCoach_sheetsUrl'); sheetsUrl = ''; setSyncStatus('');
+  document.getElementById('sheetsUrlInput').value = ''; showToast('Google Sheets disconnected', 'info');
+}
+
+async function forceSync() {
+  if (!sheetsUrl) return;
+  setSyncStatus('syncing');
+  try {
+    const res = await fetch(sheetsUrl + '?action=getAllWords');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.words) {
+        let updatedLocal = false;
+        data.words.forEach(remoteWord => {
+          const localIdx = vocab.findIndex(v => v.id === remoteWord.id);
+          if (localIdx === -1) { vocab.push(remoteWord); updatedLocal = true; } 
+          else {
+            const localTime = new Date(vocab[localIdx].lastModified || 0).getTime();
+            const remoteTime = new Date(remoteWord.lastModified || 0).getTime();
+            if (remoteTime > localTime) { vocab[localIdx] = remoteWord; updatedLocal = true; }
+          }
+        });
+        if (updatedLocal) { localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); renderVocabList(); updateDashboard(); }
+      }
+    }
+    setSyncStatus('synced');
+  } catch (err) { setSyncStatus('failed'); }
+}
+
+async function syncWordToSheets(wordData, actionType) {
+  if (!sheetsUrl) return;
+  setSyncStatus('syncing');
+  try {
+    await fetch(sheetsUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType, data: wordData }) });
+    setTimeout(() => setSyncStatus('synced'), 1000);
+  } catch (err) { setSyncStatus('failed'); }
+}
+
+async function logRatingToSheets(wordData, rating) {
+  if (!sheetsUrl) return;
+  try { await fetch(sheetsUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'logRating', data: { word: wordData.word, rating: rating, correct: rating >= 3, hints: wordData.hintsUsed } }) }); } 
+  catch(e) {}
+}
+
+/* ============================================================
+   EVENT LISTENERS & APP INITIALIZER
+============================================================ */
+document.getElementById('wordModal').addEventListener('click', function(e) { if (e.target === this) closeWordModal(); });
+document.getElementById('viewModal').addEventListener('click', function(e) { if (e.target === this) closeViewModal(); });
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeWordModal(); closeViewModal(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (document.getElementById('wordModal').classList.contains('open')) saveWord();
+  }
+});
+
+(function init() {
+  loadVocab();
+  loadFsrsFromStorage();
+  loadDarkMode();
+  sheetsUrl = localStorage.getItem('vocabCoach_sheetsUrl') || '';
+  if (sheetsUrl) forceSync(); else setSyncStatus('');
+  updateDashboard(); renderVocabList(); showTab('dashboard');
+  console.log(`✅ VocabCoach Pro initialized — ${vocab.length} words loaded`);
+})();
+</script>
+</body>
+</html>
