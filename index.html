@@ -195,10 +195,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .visual-hook { width: 100%; border-radius: var(--radius-sm); max-height: 220px; object-fit: cover; background: var(--surface2); border: 1.5px solid var(--border); margin-bottom: 16px; }
 .cloze-blank { font-weight: 800; color: var(--primary); border-bottom: 2px dashed var(--primary); padding: 0 4px; }
 
-/* Inline Deep Dive Expandable Area */
 .inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
-
-/* ===== YOUGLISH CONTAINER ===== */
 .youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
 
 /* ===== MODALS ===== */
@@ -244,7 +241,13 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     localStorage.setItem(AUTH_KEY, "true");
     alert("✅ Access granted!");
   } else {
-    document.write("<h1>Access Denied</h1>");
+    document.write(`
+      <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #0f172a; color: #ef4444; text-align: center;">
+        <div style="font-size: 64px; margin-bottom: 16px;">🚫</div>
+        <h1 style="font-size: 32px; margin-bottom: 8px;">Access Denied</h1>
+        <p style="color: #94a3b8; font-size: 16px;">Invalid PIN. Refresh the page to try again.</p>
+      </div>
+    `);
     throw new Error("Access Denied");
   }
 })();
@@ -327,9 +330,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 <!-- ===== MODAL: VIEW WORD DETAIL ===== -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
-    <div id="viewModalContent">
-      <!-- Content injected dynamically via JavaScript -->
-    </div>
+    <div id="viewModalContent"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeViewModal()">Close</button>
       <button class="btn btn-primary" onclick="editFromView()">✏️ Edit</button>
@@ -577,8 +578,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
   <!-- ========== TAB: VOCABULARY ========== -->
   <div class="tab-panel" id="tab-vocabulary">
-    
-    <!-- Sticky Bulk Action Bar -->
     <div class="bulk-action-bar" id="bulkActionBar">
       <div style="font-weight:700;"><span id="bulkSelectedCount">0</span> words selected</div>
       <div class="bulk-actions-btns">
@@ -596,7 +595,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     <div class="card" style="padding:16px;">
       <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
         <div class="search-bar">
-          <!-- Upgraded Positional Search Bar -->
           <input type="text" id="vocabSearch" placeholder="Type any letters to search words..." oninput="renderVocabList()"/>
         </div>
         <select id="vocabFilter" onchange="renderVocabList()" style="width:auto; min-width:140px;">
@@ -622,9 +620,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       <label for="selectAllCheckbox" style="font-size:13px; font-weight:700; color:var(--text2); cursor:pointer;">Select All Filtered</label>
     </div>
 
-    <div class="word-list" id="vocabList">
-      <!-- Words dynamically rendered here -->
-    </div>
+    <div class="word-list" id="vocabList"></div>
   </div>
 
   <!-- ========== TAB: BULK IMPORT ========== -->
@@ -795,3 +791,767 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     </div>
   </div>
 </main>
+<script>
+/* ============================================================
+   DATA LAYER & STORAGE
+============================================================ */
+let vocab = [];
+let fsrsSettings = { retention: 90, maxInterval: 36500 }; 
+let practiceSession = { words: [], index: 0, score: 0, hintsUsed: 0, correct: 0, wrong: 0, mode: 'active' };
+
+let currentCollocations = [];
+let currentSimilarWords = []; 
+let currentWordFamily = [];
+let currentConfusables = [];
+let currentWordAnatomy = "";
+let currentMisspellings = "";
+
+let editingWordId = null;
+let viewingWordId = null;
+let darkMode = false;
+
+let selectedWordIds = new Set();
+
+let autoPronounce = false;
+let pronounceSpeed = 0.85;
+
+/* ---------- localStorage helpers ---------- */
+function saveVocab() {
+  try { 
+    localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); 
+    if (typeof forceSync === 'function' && sheetsUrl) forceSync();
+  } catch(e) { showToast('Storage error: ' + e.message, 'error'); }
+}
+
+function loadVocab() {
+  try {
+    const raw = localStorage.getItem('vocabCoach_words');
+    vocab = raw ? JSON.parse(raw) : [];
+  } catch(e) { vocab = []; }
+}
+
+function saveFsrsToStorage() { localStorage.setItem('vocabCoach_fsrs', JSON.stringify(fsrsSettings)); }
+function loadFsrsFromStorage() {
+  try {
+    const raw = localStorage.getItem('vocabCoach_fsrs');
+    if (raw) fsrsSettings = { ...fsrsSettings, ...JSON.parse(raw) };
+  } catch(e) {}
+}
+
+function saveStreak() {
+  const today = todayStr();
+  const data = getStreakData();
+  if (data.lastDate === today) return;
+  const yesterday = offsetDate(-1);
+  data.streak = (data.lastDate === yesterday) ? data.streak + 1 : 1;
+  data.lastDate = today;
+  localStorage.setItem('vocabCoach_streak', JSON.stringify(data));
+}
+
+function getStreakData() {
+  try {
+    const raw = localStorage.getItem('vocabCoach_streak');
+    return raw ? JSON.parse(raw) : { streak: 0, lastDate: '' };
+  } catch(e) { return { streak: 0, lastDate: '' }; }
+}
+
+function saveActivity(entry) {
+  try {
+    let log = getActivityLog();
+    log.unshift({ ...entry, timestamp: Date.now() });
+    if (log.length > 50) log = log.slice(0, 50);
+    localStorage.setItem('vocabCoach_activity', JSON.stringify(log));
+  } catch(e) {}
+}
+
+function getActivityLog() {
+  try {
+    const raw = localStorage.getItem('vocabCoach_activity');
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+/* ============================================================
+   WORD DATA MODEL
+============================================================ */
+function createWord(data) {
+  return {
+    id: data.id || (Date.now().toString() + Math.random().toString(36).slice(2, 7)),
+    word: (data.word || '').trim(),
+    ipa: (data.ipa || '').trim(),
+    meaning: (data.meaning || '').trim(),
+    pos: (data.pos || '').trim(),
+    definition: (data.definition || '').trim(),
+    examples: (data.examples || []).filter(e => e.trim()),
+    collocations: (data.collocations || []),
+    mnemonic: (data.mnemonic || '').trim(),
+    
+    similarWords: (data.similarWords || []), 
+    wordFamily: (data.wordFamily || []),
+    confusables: (data.confusables || []),
+    wordAnatomy: (data.wordAnatomy || '').trim(),
+    commonMisspellings: (data.commonMisspellings || '').trim(),
+
+    dateAdded: data.dateAdded || todayStr(),
+    nextReview: data.nextReview || todayStr(),
+    proficiency: data.proficiency || 0,
+    reviewCount: data.reviewCount || 0,
+    correctCount: data.correctCount || 0,
+    wrongCount: data.wrongCount || 0,
+    hintsUsed: data.hintsUsed || 0,
+    lastRating: data.lastRating || null,
+    history: data.history || [],
+    fsrs_S: data.fsrs_S || null, 
+    fsrs_D: data.fsrs_D || null, 
+    lastReviewDate: data.lastReviewDate || null,
+    lastModified: new Date().toISOString()
+  };
+}
+
+/* ============================================================
+   DATE UTILITIES & FSRS ALGORITHM
+============================================================ */
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function offsetDate(days) {
+  const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0];
+}
+function addDays(dateStr, days) {
+  const d = new Date(dateStr); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0];
+}
+function isDue(word) { return word.nextReview <= todayStr(); }
+function daysUntilReview(word) {
+  const today = new Date(todayStr());
+  const next = new Date(word.nextReview);
+  return Math.ceil((next - today) / 86400000);
+}
+function formatDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function applyFSRS(word, rating) {
+  const w = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
+  
+  let S = word.fsrs_S || 0;
+  let D = word.fsrs_D || 0;
+  let daysSinceLast = word.lastReviewDate ? Math.max(Math.ceil((new Date() - new Date(word.lastReviewDate)) / 86400000), 1) : 1;
+  
+  if (!word.fsrs_S) {
+    S = w[rating - 1];
+    D = w[4] - Math.exp(w[5] * (rating - 1)) + 1;
+  } else {
+    let R = Math.exp(Math.log(0.9) * (daysSinceLast / S));
+    D = Math.min(Math.max(D + w[6] * (rating - 3), 1), 10);
+    
+    if (rating === 1) { 
+      S = w[11] * Math.pow(D, -w[12]) * (Math.pow(S + 1, w[13]) - 1) * Math.exp(w[14] * (1 - R));
+    } else { 
+      let e = Math.exp(w[8]) * (11 - D) * Math.pow(S, -w[9]) * (Math.exp(w[10] * (1 - R)) - 1);
+      if (rating === 2) S = S * (1 + e * w[15]);
+      if (rating === 3) S = S * (1 + e);
+      if (rating === 4) S = S * (1 + e * w[16]);
+    }
+  }
+  
+  const retention = (fsrsSettings.retention || 90) / 100;
+  let interval = S * (Math.pow(retention, 1 / Math.log(0.9)) - 1) * -1; 
+  interval = Math.min(Math.max(Math.round(interval), 1), fsrsSettings.maxInterval || 36500);
+  
+  word.fsrs_S = S; word.fsrs_D = D;
+  word.nextReview = addDays(todayStr(), interval);
+  word.lastReviewDate = new Date().toISOString();
+  word.reviewCount = (word.reviewCount || 0) + 1;
+  word.lastRating = rating;
+  
+  if (rating === 1) {
+    word.wrongCount = (word.wrongCount || 0) + 1;
+    word.proficiency = Math.max(0, (word.proficiency || 0) - 1);
+  } else if (rating === 2) {
+    word.wrongCount = (word.wrongCount || 0) + 1;
+  } else if (rating === 3) {
+    word.correctCount = (word.correctCount || 0) + 1;
+    if (word.proficiency < 3) word.proficiency = Math.min(3, (word.proficiency || 0) + 1);
+  } else if (rating === 4) {
+    word.correctCount = (word.correctCount || 0) + 1;
+    word.proficiency = Math.min(3, (word.proficiency || 0) + 2);
+  }
+  
+  word.history = word.history || [];
+  word.history.push({ date: todayStr(), rating, interval });
+  if (word.history.length > 30) word.history = word.history.slice(-30);
+  word.lastModified = new Date().toISOString();
+  
+  if (typeof logRatingToSheets === 'function') logRatingToSheets(word, rating);
+  return word;
+}
+
+function getProficiencyLabel(level) { return ['🆕 New', '📘 Learning', '🔶 Familiar', '✅ Mastered'][level] || '🆕 New'; }
+function getProficiencyBadge(level) { return ['badge-info', 'badge-warning', 'badge-primary', 'badge-success'][level] || 'badge-info'; }
+function getAccuracy(word) {
+  const total = (word.correctCount || 0) + (word.wrongCount || 0);
+  if (total === 0) return null;
+  return Math.round((word.correctCount / total) * 100);
+}
+
+/* ============================================================
+   PRONUNCIATION FALLBACK ENGINE
+============================================================ */
+function loadPronunciationSettings() {
+  const savedAuto = localStorage.getItem('vocabCoach_autoPronounce');
+  if (savedAuto !== null) autoPronounce = savedAuto === 'true';
+  const savedSpeed = localStorage.getItem('vocabCoach_pronounceSpeed');
+  if (savedSpeed) pronounceSpeed = parseFloat(savedSpeed);
+}
+
+async function pronounceWord(text) {
+  if (!text) return;
+  
+  // Priority 1: Free Dictionary API (Human MP3 Recording)
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const audioObj = data[0]?.phonetics?.find(p => p.audio && p.audio.length > 0);
+      if (audioObj && audioObj.audio) {
+        const audio = new Audio(audioObj.audio);
+        audio.playbackRate = pronounceSpeed;
+        await audio.play();
+        return;
+      }
+    }
+  } catch (e) {}
+
+  // Priority 2: Google Translate Cloud TTS Endpoint
+  try {
+    const googleUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+    const audio = new Audio(googleUrl);
+    audio.playbackRate = pronounceSpeed;
+    await audio.play();
+    return;
+  } catch (e) {}
+
+  // Priority 3: Web Speech API (Local Voice Fallback)
+  if (window.speechSynthesis) {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US'; utter.rate = pronounceSpeed; utter.pitch = 1.0; utter.volume = 1.0;
+    const voices = speechSynthesis.getVoices();
+    const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
+    if (engVoice) utter.voice = engVoice;
+    speechSynthesis.cancel(); speechSynthesis.speak(utter);
+  }
+}
+
+function toggleAutoPronounce() {
+  autoPronounce = document.getElementById('autoPronounceToggle').checked;
+  localStorage.setItem('vocabCoach_autoPronounce', autoPronounce);
+  showToast(autoPronounce ? 'Auto-pronounce enabled' : 'Auto-pronounce disabled', 'info');
+}
+
+function savePronounceSpeed() {
+  pronounceSpeed = parseFloat(document.getElementById('pronounceSpeed').value);
+  localStorage.setItem('vocabCoach_pronounceSpeed', pronounceSpeed);
+  pronounceWord("Testing voice speed.");
+}
+
+function pronounceModalWord() {
+  const word = document.getElementById('mWord').value;
+  if (word) pronounceWord(word);
+}
+
+/* ============================================================
+   YOUGLISH INTEGRATION
+============================================================ */
+let ygTabWidget = null;
+
+function onYouglishAPIReady() {
+  try {
+    ygTabWidget = new YG.Widget("youglish-tab-widget", {
+      width: 640,
+      components: 72,
+      events: {
+        'onFetchDone': onYGTabFetchDone
+      }
+    });
+  } catch(e) {
+    console.warn("YouGlish API initialization deferred", e);
+  }
+}
+
+function onYGTabFetchDone(e) {
+  if (e.totalResult === 0) {
+    showToast("No video pronunciation found for this query", "warning");
+  }
+}
+
+function searchYouglishTab() {
+  const word = document.getElementById('youglishSearchInput').value.trim();
+  const accent = document.getElementById('youglishAccentSelect').value;
+  if (!word) return showToast('Please enter a word to search', 'warning');
+  
+  if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
+    ygTabWidget.fetch(word, "english", accent);
+  } else {
+    window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
+  }
+}
+
+function searchWordInYouglishFromPractice() {
+  const word = practiceSession.words[practiceSession.index];
+  if (!word) return;
+  showTab('youglish');
+  document.getElementById('youglishSearchInput').value = word.word;
+  setTimeout(() => searchYouglishTab(), 300);
+}
+
+/* ============================================================
+   UI UTILITIES
+============================================================ */
+function toggleDark() {
+  darkMode = !darkMode; document.body.classList.toggle('dark', darkMode);
+  document.getElementById('darkBtn').textContent = darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+  localStorage.setItem('vocabCoach_dark', darkMode ? '1' : '0');
+}
+function loadDarkMode() {
+  if (localStorage.getItem('vocabCoach_dark') === '1') {
+    darkMode = true; document.body.classList.add('dark');
+    if (document.getElementById('darkBtn')) document.getElementById('darkBtn').textContent = '☀️ Light Mode';
+  }
+}
+
+// Automatic YouGlish Video Pause on Tab Navigation
+function showTab(tabName) {
+  if (ygTabWidget && typeof ygTabWidget.pause === 'function') {
+    try { ygTabWidget.pause(); } catch(e){}
+  }
+
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  if (document.getElementById('tab-' + tabName)) document.getElementById('tab-' + tabName).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tabName + "'")) btn.classList.add('active');
+  });
+  if (tabName === 'dashboard') updateDashboard();
+  if (tabName === 'vocabulary') renderVocabList();
+  if (tabName === 'settings') loadSettingsUI();
+}
+
+function showToast(message, type = 'info', duration = 3500) {
+  const container = document.getElementById('toastContainer');
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => toast.remove(), 300); }, duration);
+}
+function logLine(containerId, message, type = 'info') {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = `log-line log-${type}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
+}
+function clearLog(containerId) {
+  if (document.getElementById(containerId)) document.getElementById(containerId).innerHTML = '';
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+function updateDashboard() {
+  const total = vocab.length;
+  const due = vocab.filter(w => isDue(w)).length;
+  const mastered = vocab.filter(w => w.proficiency === 3).length;
+  const streakData = getStreakData();
+  
+  let totalCorrect = 0, totalWrong = 0;
+  vocab.forEach(w => { totalCorrect += (w.correctCount || 0); totalWrong += (w.wrongCount || 0); });
+  const totalAnswered = totalCorrect + totalWrong;
+  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+  
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDue').textContent = due;
+  document.getElementById('statMastered').textContent = mastered;
+  document.getElementById('statStreak').textContent = streakData.streak;
+  document.getElementById('statAccuracy').textContent = accuracy + '%';
+  
+  const levels = [0, 1, 2, 3];
+  const labels = ['🆕 New', '📘 Learning', '🔶 Familiar', '✅ Mastered'];
+  const colors = ['red', 'orange', '', 'green'];
+  const counts = levels.map(l => vocab.filter(w => (w.proficiency || 0) === l).length);
+  const barsEl = document.getElementById('proficiencyBars');
+  barsEl.innerHTML = '';
+  levels.forEach((l, i) => {
+    const pct = total > 0 ? Math.round((counts[i] / total) * 100) : 0;
+    barsEl.innerHTML += `
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+          <span>${labels[i]}</span><span style="color:var(--text2);">${counts[i]} words (${pct}%)</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill ${colors[i]}" style="width:${pct}%"></div></div>
+      </div>`;
+  });
+  
+  const weakEl = document.getElementById('weakestWords');
+  const weak = vocab.filter(w => (w.reviewCount || 0) > 0).sort((a, b) => (getAccuracy(a) ?? 100) - (getAccuracy(b) ?? 100)).slice(0, 5);
+  if (weak.length === 0) {
+    weakEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🌱</div><div class="empty-state-text">Practice more to identify weak words</div></div>`;
+  } else {
+    weakEl.innerHTML = weak.map(w => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div><div style="font-weight:700;color:var(--text);">${escHtml(w.word)}</div><div style="font-size:12px;color:var(--text2);">${escHtml(w.meaning)}</div></div>
+        <span class="badge badge-danger">${getAccuracy(w) !== null ? getAccuracy(w) + '%' : 'No data'}</span>
+      </div>`).join('');
+  }
+  
+  const actEl = document.getElementById('recentActivity');
+  const log = getActivityLog();
+  if (log.length === 0) {
+    actEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No activity yet. Start practicing!</div></div>`;
+  } else {
+    actEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;">` + log.slice(0, 8).map(entry => `
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span>${entry.message}</span><span style="color:var(--text2);white-space:nowrap;margin-left:12px;">${timeAgo(entry.timestamp)}</span>
+      </div>`).join('') + `</div>`;
+  }
+}
+
+/* ============================================================
+   SETTINGS & DATA MANAGEMENT
+============================================================ */
+function loadSettingsUI() {
+  document.getElementById('geminiKeyInput').value = localStorage.getItem('vocabCoach_geminiKey') || '';
+  document.getElementById('sheetsUrlInput').value = localStorage.getItem('vocabCoach_sheetsUrl') || '';
+  
+  document.getElementById('fsrsRetention').value = fsrsSettings.retention || 90;
+  document.getElementById('fsrsMaxInterval').value = fsrsSettings.maxInterval || 36500;
+  
+  loadPronunciationSettings();
+  document.getElementById('autoPronounceToggle').checked = autoPronounce;
+  document.getElementById('pronounceSpeed').value = pronounceSpeed;
+}
+
+function toggleKeyVisibility() {
+  const input = document.getElementById('geminiKeyInput');
+  const btn = document.getElementById('toggleKeyBtn');
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈 Hide'; }
+  else { input.type = 'password'; btn.textContent = '👁️ Show'; }
+}
+function saveApiKey() {
+  const key = document.getElementById('geminiKeyInput').value.trim();
+  if (!key) return showToast('Please enter an API key first', 'warning');
+  localStorage.setItem('vocabCoach_geminiKey', key);
+  showToast('✅ API key saved successfully!', 'success');
+}
+function clearApiKey() {
+  if (!confirm('Remove saved API key?')) return;
+  localStorage.removeItem('vocabCoach_geminiKey');
+  document.getElementById('geminiKeyInput').value = '';
+  showToast('API key removed', 'info');
+}
+
+function saveFsrsSettings() {
+  fsrsSettings.retention = parseInt(document.getElementById('fsrsRetention').value) || 90;
+  fsrsSettings.maxInterval = parseInt(document.getElementById('fsrsMaxInterval').value) || 36500;
+  saveFsrsToStorage();
+  showToast('✅ FSRS settings saved!', 'success');
+}
+function resetFsrsSettings() {
+  fsrsSettings = { retention: 90, maxInterval: 36500 };
+  saveFsrsToStorage(); loadSettingsUI(); showToast('FSRS settings reset', 'info');
+}
+
+function exportData(format) {
+  if (vocab.length === 0) return showToast('No words to export', 'warning');
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(vocab, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `vocabcoach_${todayStr()}.json`);
+    showToast(`✅ Exported ${vocab.length} words as JSON`, 'success');
+  }
+}
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Invalid format');
+      const valid = data.filter(w => w.word && w.meaning);
+      let added = 0;
+      valid.forEach(w => {
+        if (!vocab.find(v => v.word.toLowerCase() === w.word.toLowerCase())) {
+          vocab.push({ ...createWord(w), ...w }); added++;
+        }
+      });
+      saveVocab(); renderVocabList(); updateDashboard();
+      showToast(`✅ Imported ${added} new words (${valid.length - added} duplicates skipped)`, 'success');
+    } catch(err) { showToast('Import failed: ' + err.message, 'error'); }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function exportExcel() {
+  if (vocab.length === 0) return showToast('No words to export', 'warning');
+  try {
+    const wb = XLSX.utils.book_new();
+    const vocabData = vocab.map(w => ({
+      ID: w.id, Word: w.word, IPA: w.ipa || '', ArabicMeaning: w.meaning, PartOfSpeech: w.pos || '',
+      Definition: w.definition || '', Examples: (w.examples || []).join(' | '),
+      Collocations: (w.collocations || []).join(' | '), Mnemonic: w.mnemonic || '',
+      SimilarWordsJSON: JSON.stringify(w.similarWords || []), 
+      WordFamilyJSON: JSON.stringify(w.wordFamily || []),
+      ConfusablesJSON: JSON.stringify(w.confusables || []),
+      WordAnatomy: w.wordAnatomy || '', CommonMisspellings: w.commonMisspellings || '',
+      Proficiency: w.proficiency, ReviewCount: w.reviewCount, CorrectCount: w.correctCount,
+      WrongCount: w.wrongCount, HintsUsed: w.hintsUsed || 0, NextReviewDate: w.nextReview,
+      FSRS_S: w.fsrs_S || '', FSRS_D: w.fsrs_D || '', 
+      DateAdded: w.dateAdded, LastModified: w.lastModified || new Date().toISOString()
+    }));
+    const wsVocab = XLSX.utils.json_to_sheet(vocabData);
+    XLSX.utils.book_append_sheet(wb, wsVocab, "Vocabulary");
+    XLSX.writeFile(wb, `vocabcoach_backup_${todayStr()}.xlsx`);
+    showToast(`✅ Exported Excel Backup (${vocab.length} words)`, 'success');
+  } catch (err) { showToast('Excel export failed: ' + err.message, 'error'); }
+}
+
+function importExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(worksheet);
+      
+      if (!json || json.length === 0) throw new Error('Excel sheet is empty');
+      let added = 0;
+      json.forEach(row => {
+        if (!row.Word || !row.ArabicMeaning) return;
+        if (!vocab.find(v => v.word.toLowerCase() === row.Word.toLowerCase())) {
+          vocab.push(createWord({
+            id: row.ID, word: row.Word, ipa: row.IPA, meaning: row.ArabicMeaning, pos: row.PartOfSpeech,
+            definition: row.Definition, examples: row.Examples ? String(row.Examples).split(' | ') : [],
+            collocations: row.Collocations ? String(row.Collocations).split(' | ') : [],
+            mnemonic: row.Mnemonic, 
+            similarWords: row.SimilarWordsJSON ? JSON.parse(row.SimilarWordsJSON) : [],
+            wordFamily: row.WordFamilyJSON ? JSON.parse(row.WordFamilyJSON) : [],
+            confusables: row.ConfusablesJSON ? JSON.parse(row.ConfusablesJSON) : [],
+            wordAnatomy: row.WordAnatomy || '', commonMisspellings: row.CommonMisspellings || '',
+            proficiency: parseInt(row.Proficiency) || 0, reviewCount: parseInt(row.ReviewCount) || 0,
+            correctCount: parseInt(row.CorrectCount) || 0, wrongCount: parseInt(row.WrongCount) || 0,
+            hintsUsed: parseInt(row.HintsUsed) || 0, nextReview: row.NextReviewDate, 
+            fsrs_S: parseFloat(row.FSRS_S) || null, fsrs_D: parseFloat(row.FSRS_D) || null,
+            dateAdded: row.DateAdded
+          }));
+          added++;
+        }
+      });
+      saveVocab(); renderVocabList(); updateDashboard();
+      showToast(`✅ Imported ${added} words from Excel`, 'success');
+    } catch(err) { showToast('Excel import failed: ' + err.message, 'error'); }
+    event.target.value = '';
+  };
+  reader.readArrayBuffer(file);
+}
+
+function confirmClearAll() {
+  if (!confirm('⚠️ This will permanently delete ALL your vocabulary data. Are you sure?')) return;
+  if (!confirm('Last chance — delete everything?')) return;
+  vocab = []; saveVocab();
+  localStorage.removeItem('vocabCoach_activity'); localStorage.removeItem('vocabCoach_streak');
+  renderVocabList(); updateDashboard(); showToast('All data cleared', 'warning');
+}
+
+/* ============================================================
+   BULK SELECTION LOGIC
+============================================================ */
+function toggleSelectAll(isChecked) {
+  const checkboxes = document.querySelectorAll('.word-item-checkbox:not(#selectAllCheckbox)');
+  selectedWordIds.clear();
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+    if (isChecked) selectedWordIds.add(cb.dataset.id);
+  });
+  updateBulkActionBar();
+}
+
+function toggleWordSelection(id, isChecked) {
+  if (isChecked) selectedWordIds.add(id);
+  else selectedWordIds.delete(id);
+  
+  const allFiltered = document.querySelectorAll('.word-item-checkbox:not(#selectAllCheckbox)');
+  document.getElementById('selectAllCheckbox').checked = (selectedWordIds.size === allFiltered.length && allFiltered.length > 0);
+  updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+  const bar = document.getElementById('bulkActionBar');
+  const countSpan = document.getElementById('bulkSelectedCount');
+  countSpan.textContent = selectedWordIds.size;
+  
+  if (selectedWordIds.size > 0) {
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+    document.getElementById('selectAllCheckbox').checked = false;
+  }
+}
+
+function clearBulkSelection() {
+  selectedWordIds.clear();
+  document.querySelectorAll('.word-item-checkbox').forEach(cb => cb.checked = false);
+  updateBulkActionBar();
+}
+
+function bulkDeleteWords() {
+  if (!confirm(`Are you sure you want to delete ${selectedWordIds.size} words?`)) return;
+  vocab = vocab.filter(v => !selectedWordIds.has(v.id));
+  saveVocab();
+  showToast(`🗑️ ${selectedWordIds.size} words deleted.`, 'info');
+  clearBulkSelection();
+  renderVocabList();
+  updateDashboard();
+}
+
+async function bulkReLookupAI() {
+  if (!confirm(`Re-run AI lookup for ${selectedWordIds.size} words? This will overwrite their metadata (definitions, meanings, etc.) but keep your SRS progress.`)) return;
+  
+  const idsToProcess = Array.from(selectedWordIds);
+  clearBulkSelection();
+  
+  let successCount = 0;
+  showToast('🤖 Bulk AI Lookup started...', 'info');
+  
+  for (let id of idsToProcess) {
+    const wIdx = vocab.findIndex(v => v.id === id);
+    if (wIdx === -1) continue;
+    
+    try {
+      const prompt = buildLookupPrompt(vocab[wIdx].word);
+      const { text } = await callGemini(localStorage.getItem('vocabCoach_geminiKey') || '', prompt, null);
+      const res = JSON.parse(text);
+      
+      vocab[wIdx].ipa = res.ipa || vocab[wIdx].ipa;
+      vocab[wIdx].meaning = res.meaning || vocab[wIdx].meaning;
+      vocab[wIdx].pos = res.pos || vocab[wIdx].pos;
+      vocab[wIdx].definition = res.definition || vocab[wIdx].definition;
+      vocab[wIdx].examples = (res.examples && res.examples.length > 0) ? res.examples : vocab[wIdx].examples;
+      vocab[wIdx].collocations = (res.collocations && res.collocations.length > 0) ? res.collocations : vocab[wIdx].collocations;
+      vocab[wIdx].mnemonic = res.mnemonic || vocab[wIdx].mnemonic;
+      vocab[wIdx].similarWords = res.similarWords || vocab[wIdx].similarWords;
+      vocab[wIdx].wordFamily = res.wordFamily || vocab[wIdx].wordFamily;
+      vocab[wIdx].confusables = res.confusables || vocab[wIdx].confusables;
+      vocab[wIdx].wordAnatomy = res.wordAnatomy || vocab[wIdx].wordAnatomy;
+      vocab[wIdx].commonMisspellings = res.commonMisspellings || vocab[wIdx].commonMisspellings;
+      vocab[wIdx].lastModified = new Date().toISOString();
+      
+      successCount++;
+    } catch (e) {
+      console.error("Bulk AI fail for", vocab[wIdx].word, e);
+    }
+  }
+  
+  saveVocab();
+  renderVocabList();
+  showToast(`✅ Bulk AI update complete (${successCount}/${idsToProcess.length} succeeded)`, 'success');
+}
+
+/* ============================================================
+   VOCABULARY LIST RENDERING (Positional Search)
+============================================================ */
+function renderVocabList() {
+  const search = (document.getElementById('vocabSearch').value || '').toLowerCase().trim();
+  const filter = document.getElementById('vocabFilter').value;
+  const sort   = document.getElementById('vocabSort').value;
+  
+  let list = [...vocab];
+  
+  if (filter === 'due')      list = list.filter(w => isDue(w));
+  if (filter === 'mastered') list = list.filter(w => w.proficiency === 3);
+  if (filter === 'learning') list = list.filter(w => w.proficiency === 1 || w.proficiency === 2);
+  if (filter === 'new')      list = list.filter(w => (w.proficiency || 0) === 0);
+  
+  if (search) {
+    list = list.filter(w => w.word.toLowerCase().includes(search));
+    list.forEach(w => {
+      const idx = w.word.toLowerCase().indexOf(search);
+      w._searchScore = idx === 0 ? 0 : idx; 
+    });
+  }
+  
+  if (search) {
+    list.sort((a, b) => a._searchScore - b._searchScore || a.word.localeCompare(b.word));
+  } else {
+    if (sort === 'newest') list.sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+    if (sort === 'oldest') list.sort((a, b) => a.dateAdded.localeCompare(b.dateAdded));
+    if (sort === 'az')     list.sort((a, b) => a.word.localeCompare(b.word));
+    if (sort === 'za')     list.sort((a, b) => b.word.localeCompare(a.word));
+    if (sort === 'due')    list.sort((a, b) => a.nextReview.localeCompare(b.nextReview));
+    if (sort === 'weak')   list.sort((a, b) => (getAccuracy(a) ?? 101) - (getAccuracy(b) ?? 101));
+  }
+  
+  const container = document.getElementById('vocabList');
+  if (list.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${search ? '🔍' : '📭'}</div><div class="empty-state-title">${search ? 'No results found' : 'No words yet'}</div><div class="empty-state-text">${search ? 'Try a different search term' : 'Click "Add Word" to start building your vocabulary!'}</div></div>`;
+    return;
+  }
+  
+  container.innerHTML = list.map(w => {
+    const due = isDue(w); const daysLeft = daysUntilReview(w); const acc = getAccuracy(w);
+    const profBadge = getProficiencyBadge(w.proficiency); const profLabel = getProficiencyLabel(w.proficiency);
+    const dueBadge = due ? `<span class="badge badge-danger">🔥 Due</span>` : `<span class="badge badge-info">📅 ${daysLeft}d</span>`;
+    const isChecked = selectedWordIds.has(w.id) ? 'checked' : '';
+    const spellingWarning = w.commonMisspellings ? `<span class="spelling-warning" title="${escHtml(w.commonMisspellings)}">⚠️ Spelling</span>` : '';
+
+    return `
+      <div class="word-item" id="wordItem_${w.id}">
+        <input type="checkbox" class="word-item-checkbox" data-id="${w.id}" ${isChecked} onchange="toggleWordSelection('${w.id}', this.checked)">
+        <div class="word-item-left">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span class="word-item-word">
+              ${escHtml(w.word)}
+              <button class="btn-pronounce" onclick="pronounceWord('${escHtml(w.word).replace(/'/g, "\\'")}')" title="Pronounce">🔊</button>
+            </span>
+            ${w.ipa ? `<span style="font-size:13px; color:var(--text2);">${escHtml(w.ipa)}</span>` : ''}
+            <span class="badge ${profBadge}">${profLabel}</span>
+            ${dueBadge}
+            ${spellingWarning}
+          </div>
+          <div class="word-item-meta">
+            ${w.meaning ? `<span style="margin-right:12px;">🇸🇦 ${escHtml(w.meaning)}</span>` : ''}
+            ${w.pos ? `<span style="margin-right:12px; text-transform:capitalize;">📝 ${escHtml(w.pos)}</span>` : ''}
+            ${acc !== null ? `<span>🎯 ${acc}% accuracy</span>` : ''}
+          </div>
+        </div>
+        <div class="word-item-actions">
+          <button class="btn btn-ghost btn-icon" onclick="viewWord('${w.id}')" title="View Details">👁️</button>
+          <button class="btn btn-ghost btn-icon" onclick="practiceOneWord('${w.id}')" title="Quick Practice">🧠</button>
+          <button class="btn btn-ghost btn-icon" onclick="openEditWordModal('${w.id}')" title="Edit">✏️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+  
