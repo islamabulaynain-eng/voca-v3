@@ -330,7 +330,9 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 <!-- ===== MODAL: VIEW WORD DETAIL ===== -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
-    <div id="viewModalContent"></div>
+    <div id="viewModalContent">
+      <!-- Content injected dynamically via JavaScript -->
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeViewModal()">Close</button>
       <button class="btn btn-primary" onclick="editFromView()">✏️ Edit</button>
@@ -2503,6 +2505,13 @@ document.addEventListener('keydown', function(e) {
   loadVocab();
   loadFsrsFromStorage();
   loadDarkMode();
+  
+  // Pre-load speech voices for instant audio playback
+  if (window.speechSynthesis) {
+    speechSynthesis.getVoices();
+    speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+  }
+
   sheetsUrl = localStorage.getItem('vocabCoach_sheetsUrl') || '';
   if (sheetsUrl) forceSync(); else setSyncStatus('');
   updateDashboard(); renderVocabList(); showTab('dashboard');
