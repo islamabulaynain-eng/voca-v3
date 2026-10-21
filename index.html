@@ -8,6 +8,9 @@
 <!-- SheetJS for Excel Import/Export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+<!-- Official YouGlish Embedded JS API -->
+<script src="https://youglish.com/public/emb/widget.js" async></script>
+
 <style>
 /* ===== CSS VARIABLES & THEMING ===== */
 :root {
@@ -94,7 +97,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); margin-bottom: 24px; }
 .card-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 
-/* ===== DASHBOARD STATS ===== */
+/* ===== DASHBOARD STATS (FLEXBOX ALIGNMENT) ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-sm); transition: var(--transition); text-align: left; }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--primary-light); }
@@ -194,6 +197,9 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 /* Inline Deep Dive Expandable Area */
 .inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
+
+/* ===== YOUGLISH CONTAINER ===== */
+.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
 
 /* ===== MODALS ===== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -352,6 +358,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
   <button class="nav-tab" onclick="showTab('practice')">🧠 Practice & Review</button>
   <button class="nav-tab" onclick="showTab('vocabulary')">📖 Vocabulary</button>
   <button class="nav-tab" onclick="showTab('bulk-import')">📥 Bulk Import</button>
+  <button class="nav-tab" onclick="showTab('youglish')">🎬 YouGlish</button>
   <button class="nav-tab" onclick="showTab('settings')">⚙️ Settings</button>
 </nav>
 
@@ -509,6 +516,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('family')">🌳 Word Family</button>
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('confusables')">⚠️ Watch Out</button>
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('similar')">🔄 Similar Words</button>
+          <button class="btn btn-ghost btn-sm" onclick="searchWordInYouglishFromPractice()">🎬 Video Context</button>
         </div>
 
         <div id="practiceInlineContainer" class="inline-deep-dive"></div>
@@ -686,6 +694,26 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     </div>
   </div>
 
+  <!-- ========== TAB: YOUGLISH (DEDICATED) ========== -->
+  <div class="tab-panel" id="tab-youglish">
+    <div class="card">
+      <div class="card-title">🎬 YouGlish — Real Video Context</div>
+      <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+        <input type="text" id="youglishSearchInput" placeholder="Enter a word to watch video clips..." style="flex:1;"/>
+        <select id="youglishAccentSelect" style="width:auto; min-width:130px;">
+          <option value="english">All English</option>
+          <option value="us">American (US)</option>
+          <option value="uk">British (UK)</option>
+          <option value="aus">Australian (AUS)</option>
+        </select>
+        <button class="btn btn-primary" onclick="searchYouglishTab()">🎬 Watch Clips</button>
+      </div>
+      <div class="youglish-wrapper">
+        <div id="youglish-tab-widget"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== TAB: SETTINGS ========== -->
   <div class="tab-panel" id="tab-settings">
     <div class="card">
@@ -780,7 +808,6 @@ let vocab = [];
 let fsrsSettings = { retention: 90, maxInterval: 36500 }; 
 let practiceSession = { words: [], index: 0, score: 0, hintsUsed: 0, correct: 0, wrong: 0, mode: 'active' };
 
-// Temporary variables for holding AI-generated lexical arrays during Add/Edit
 let currentCollocations = [];
 let currentSimilarWords = []; 
 let currentWordFamily = [];
@@ -792,10 +819,8 @@ let editingWordId = null;
 let viewingWordId = null;
 let darkMode = false;
 
-// Bulk Action State
 let selectedWordIds = new Set();
 
-// Pronunciation Settings
 let autoPronounce = false;
 let pronounceSpeed = 0.85;
 
@@ -856,7 +881,7 @@ function getActivityLog() {
 }
 
 /* ============================================================
-   WORD DATA MODEL (UPGRADED FOR CURRICULUM FEATURES)
+   WORD DATA MODEL
 ============================================================ */
 function createWord(data) {
   return {
@@ -870,7 +895,6 @@ function createWord(data) {
     collocations: (data.collocations || []),
     mnemonic: (data.mnemonic || '').trim(),
     
-    // Lexical Deep-Dive Fields
     similarWords: (data.similarWords || []), 
     wordFamily: (data.wordFamily || []),
     confusables: (data.confusables || []),
@@ -925,7 +949,6 @@ function timeAgo(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// FREE SPACED REPETITION SCHEDULER (FSRS v4) IMPLEMENTATION
 function applyFSRS(word, rating) {
   const w = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
   
@@ -991,7 +1014,7 @@ function getAccuracy(word) {
 }
 
 /* ============================================================
-   PRONUNCIATION FEATURE
+   PRONUNCIATION FALLBACK ENGINE
 ============================================================ */
 function loadPronunciationSettings() {
   const savedAuto = localStorage.getItem('vocabCoach_autoPronounce');
@@ -1000,14 +1023,42 @@ function loadPronunciationSettings() {
   if (savedSpeed) pronounceSpeed = parseFloat(savedSpeed);
 }
 
-function pronounceWord(text) {
-  if (!text || !window.speechSynthesis) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = 'en-US'; utter.rate = pronounceSpeed; utter.pitch = 1.0; utter.volume = 1.0;
-  const voices = speechSynthesis.getVoices();
-  const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
-  if (engVoice) utter.voice = engVoice;
-  speechSynthesis.cancel(); speechSynthesis.speak(utter);
+async function pronounceWord(text) {
+  if (!text) return;
+  
+  // Priority 1: Free Dictionary API (Human MP3 Recording)
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const audioObj = data[0]?.phonetics?.find(p => p.audio && p.audio.length > 0);
+      if (audioObj && audioObj.audio) {
+        const audio = new Audio(audioObj.audio);
+        audio.playbackRate = pronounceSpeed;
+        await audio.play();
+        return;
+      }
+    }
+  } catch (e) {}
+
+  // Priority 2: Google Translate Cloud TTS Endpoint
+  try {
+    const googleUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+    const audio = new Audio(googleUrl);
+    audio.playbackRate = pronounceSpeed;
+    await audio.play();
+    return;
+  } catch (e) {}
+
+  // Priority 3: Web Speech API (Local Voice Fallback)
+  if (window.speechSynthesis) {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US'; utter.rate = pronounceSpeed; utter.pitch = 1.0; utter.volume = 1.0;
+    const voices = speechSynthesis.getVoices();
+    const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
+    if (engVoice) utter.voice = engVoice;
+    speechSynthesis.cancel(); speechSynthesis.speak(utter);
+  }
 }
 
 function toggleAutoPronounce() {
@@ -1019,12 +1070,58 @@ function toggleAutoPronounce() {
 function savePronounceSpeed() {
   pronounceSpeed = parseFloat(document.getElementById('pronounceSpeed').value);
   localStorage.setItem('vocabCoach_pronounceSpeed', pronounceSpeed);
-  pronounceWord("This is how fast I will speak.");
+  pronounceWord("Testing voice speed.");
 }
 
 function pronounceModalWord() {
   const word = document.getElementById('mWord').value;
   if (word) pronounceWord(word);
+}
+
+/* ============================================================
+   YOUGLISH INTEGRATION
+============================================================ */
+let ygTabWidget = null;
+
+function onYouglishAPIReady() {
+  try {
+    ygTabWidget = new YG.Widget("youglish-tab-widget", {
+      width: 640,
+      components: 72,
+      events: {
+        'onFetchDone': onYGTabFetchDone
+      }
+    });
+  } catch(e) {
+    console.warn("YouGlish API initialization deferred", e);
+  }
+}
+
+function onYGTabFetchDone(e) {
+  if (e.totalResult === 0) {
+    showToast("No video pronunciation found for this query", "warning");
+  }
+}
+
+function searchYouglishTab() {
+  const word = document.getElementById('youglishSearchInput').value.trim();
+  const accent = document.getElementById('youglishAccentSelect').value;
+  if (!word) return showToast('Please enter a word to search', 'warning');
+  
+  if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
+    ygTabWidget.fetch(word, "english", accent);
+  } else {
+    // Fallback if widget script is unreachable or blocked
+    window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
+  }
+}
+
+function searchWordInYouglishFromPractice() {
+  const word = practiceSession.words[practiceSession.index];
+  if (!word) return;
+  showTab('youglish');
+  document.getElementById('youglishSearchInput').value = word.word;
+  setTimeout(() => searchYouglishTab(), 300);
 }
 
 /* ============================================================
@@ -1144,7 +1241,6 @@ function updateDashboard() {
 function loadSettingsUI() {
   document.getElementById('geminiKeyInput').value = localStorage.getItem('vocabCoach_geminiKey') || '';
   document.getElementById('sheetsUrlInput').value = localStorage.getItem('vocabCoach_sheetsUrl') || '';
-  
   document.getElementById('fsrsRetention').value = fsrsSettings.retention || 90;
   document.getElementById('fsrsMaxInterval').value = fsrsSettings.maxInterval || 36500;
   
@@ -1175,8 +1271,7 @@ function clearApiKey() {
 function saveFsrsSettings() {
   fsrsSettings.retention = parseInt(document.getElementById('fsrsRetention').value) || 90;
   fsrsSettings.maxInterval = parseInt(document.getElementById('fsrsMaxInterval').value) || 36500;
-  saveFsrsToStorage();
-  showToast('✅ FSRS settings saved!', 'success');
+  saveFsrsToStorage(); showToast('✅ FSRS settings saved!', 'success');
 }
 function resetFsrsSettings() {
   fsrsSettings = { retention: 90, maxInterval: 36500 };
@@ -1694,6 +1789,17 @@ function saveWord() {
   }
   
   saveVocab(); closeWordModal(); renderVocabList(); updateDashboard();
+}
+
+function deleteWord(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  if (!confirm(`Delete "${w.word}" from your library?`)) return;
+  vocab = vocab.filter(v => v.id !== id);
+  saveVocab(); renderVocabList(); updateDashboard();
+  showToast(`🗑️ "${w.word}" deleted`, 'info');
+  saveActivity({ message: `🗑️ Deleted word: "${w.word}"` });
+  if (typeof syncWordToSheets === 'function') syncWordToSheets({ id }, 'delete');
 }
 
 function practiceOneWord(id) {
