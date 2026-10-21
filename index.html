@@ -123,7 +123,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 .btn-pronounce { background: none; border: none; font-size: 18px; padding: 4px; cursor: pointer; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; transition: var(--transition); }
 .btn-pronounce:hover { background: var(--primary-light); transform: scale(1.1); }
-
 /* ===== FORMS & UTILS ===== */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .form-group { display: flex; flex-direction: column; gap: 8px; }
@@ -320,7 +319,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     </div>
   </div>
 </div>
-
 <!-- ===== MODAL: VIEW WORD DETAIL ===== -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
@@ -422,7 +420,8 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       </div>
     </div>
   </div>
-<!-- ========== TAB: PRACTICE & REVIEW ========== -->
+
+  <!-- ========== TAB: PRACTICE & REVIEW ========== -->
   <div class="tab-panel" id="tab-practice">
     <div class="card" id="practiceSetupCard">
       <div class="card-title">🧠 Practice Session Setup</div>
@@ -570,7 +569,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       </div>
     </div>
   </div>
-
   <!-- ========== TAB: VOCABULARY ========== -->
   <div class="tab-panel" id="tab-vocabulary">
     
@@ -1056,9 +1054,36 @@ function pronounceModalWord() {
 }
 
 /* ============================================================
-   SAME-PAGE YOUGLISH EMBEDDED CONTROLLER
+   SAME-PAGE YOUGLISH EMBEDDED CONTROLLER (FIXED)
 ============================================================ */
 let ygTabWidget = null;
+let isYouglishReady = false;
+
+// Safe global ready hook called automatically when YouGlish script loads
+window.onYouglishAPIReady = function() {
+  isYouglishReady = true;
+  initYouglishWidget();
+};
+
+function initYouglishWidget() {
+  if (ygTabWidget || typeof YG === 'undefined') return;
+  try {
+    ygTabWidget = new YG.Widget("youglish-tab-widget", {
+      width: "100%",
+      components: 72,
+      events: {
+        'onFetchDone': function(e) {
+          if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
+        },
+        'onError': function(e) {
+          console.error("YouGlish Widget error:", e);
+        }
+      }
+    });
+  } catch (e) {
+    console.error("YouGlish initialization error:", e);
+  }
+}
 
 function searchYouglishTab() {
   const word = document.getElementById('youglishSearchInput').value.trim();
@@ -1066,25 +1091,13 @@ function searchYouglishTab() {
   if (!word) return showToast('Please enter a word to search', 'warning');
 
   if (!ygTabWidget && typeof YG !== 'undefined') {
-    try {
-      ygTabWidget = new YG.Widget("youglish-tab-widget", {
-        width: "100%",
-        components: 72,
-        events: {
-          'onFetchDone': function(e) {
-            if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
-          }
-        }
-      });
-    } catch (e) {
-      console.error("YouGlish initialization error:", e);
-    }
+    initYouglishWidget();
   }
 
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
   } else {
-    showToast("YouGlish API loading. Please click 'Watch Clips' again in a moment.", "info");
+    showToast("YouGlish API is loading. Please try again in a moment.", "info");
   }
 }
 
@@ -1093,7 +1106,7 @@ function searchWordInYouglishFromPractice() {
   if (!word) return;
   showTab('youglish');
   document.getElementById('youglishSearchInput').value = word.word;
-  setTimeout(() => searchYouglishTab(), 100);
+  setTimeout(() => searchYouglishTab(), 150);
 }
 
 /* ============================================================
@@ -1540,6 +1553,7 @@ function renderVocabList() {
       </div>`;
   }).join('');
 }
+
 /* ============================================================
    VIEW WORD DETAIL MODAL (W/ LEXICAL CURRICULUM TABLES)
 ============================================================ */
