@@ -205,14 +205,6 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .modal-title { font-size: 24px; font-weight: 900; margin-bottom: 24px; color: var(--text); display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--surface2); padding-bottom: 16px; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
 
-/* ===== MISC UTILS ===== */
-.progress-bar-wrap { background: var(--surface2); border-radius: 99px; height: 12px; overflow: hidden; margin: 8px 0; border: 1px inset var(--border); }
-.progress-bar-fill { height: 100%; border-radius: 99px; background: var(--primary); transition: width 0.5s ease; }
-.log-window { background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; min-height: 120px; max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #334155; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-.search-bar { position: relative; flex: 1; }
-.search-bar input { padding-left: 44px; font-size: 16px; }
-.search-bar::before { content: '🔍'; position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; z-index: 1; opacity: 0.5; }
-
 .bulk-textarea { width: 100%; min-height: 120px; font-family: monospace; }
 .bulk-word-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .bulk-word-tag { background: var(--surface2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 16px; font-size: 13px; }
@@ -878,7 +870,7 @@ function getActivityLog() {
 }
 
 /* ============================================================
-   WORD DATA MODEL
+   WORD DATA MODEL (UPGRADED FOR CURRICULUM FEATURES)
 ============================================================ */
 function createWord(data) {
   return {
@@ -892,6 +884,7 @@ function createWord(data) {
     collocations: (data.collocations || []),
     mnemonic: (data.mnemonic || '').trim(),
     
+    // Lexical Deep-Dive Fields
     similarWords: (data.similarWords || []), 
     wordFamily: (data.wordFamily || []),
     confusables: (data.confusables || []),
@@ -946,6 +939,7 @@ function timeAgo(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// FREE SPACED REPETITION SCHEDULER (FSRS v4) IMPLEMENTATION
 function applyFSRS(word, rating) {
   const w = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
   
@@ -1011,7 +1005,7 @@ function getAccuracy(word) {
 }
 
 /* ============================================================
-   PRONUNCIATION FALLBACK ENGINE
+   INSTANT V1 PRONUNCIATION ENGINE (ZERO NETWORK LAG)
 ============================================================ */
 function loadPronunciationSettings() {
   const savedAuto = localStorage.getItem('vocabCoach_autoPronounce');
@@ -1020,42 +1014,26 @@ function loadPronunciationSettings() {
   if (savedSpeed) pronounceSpeed = parseFloat(savedSpeed);
 }
 
-async function pronounceWord(text) {
-  if (!text) return;
-  
-  // Priority 1: Free Dictionary API (Human MP3 Recording)
-  try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const audioObj = data[0]?.phonetics?.find(p => p.audio && p.audio.length > 0);
-      if (audioObj && audioObj.audio) {
-        const audio = new Audio(audioObj.audio);
-        audio.playbackRate = pronounceSpeed;
-        await audio.play();
-        return;
-      }
-    }
-  } catch (e) {}
+function pronounceWord(text) {
+  if (!text || !window.speechSynthesis) return;
 
-  // Priority 2: Google Translate Cloud TTS Endpoint
-  try {
-    const googleUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
-    const audio = new Audio(googleUrl);
-    audio.playbackRate = pronounceSpeed;
-    await audio.play();
-    return;
-  } catch (e) {}
+  // Instantly cancel any ongoing speech
+  speechSynthesis.cancel();
 
-  // Priority 3: Web Speech API (Local Voice Fallback)
-  if (window.speechSynthesis) {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'en-US'; utter.rate = pronounceSpeed; utter.pitch = 1.0; utter.volume = 1.0;
-    const voices = speechSynthesis.getVoices();
-    const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
-    if (engVoice) utter.voice = engVoice;
-    speechSynthesis.cancel(); speechSynthesis.speak(utter);
-  }
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'en-US';
+  utter.rate = pronounceSpeed || 0.85;
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+
+  // Pick best local voice instantly
+  const voices = speechSynthesis.getVoices();
+  const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService) || 
+                   voices.find(v => v.lang.startsWith('en'));
+  if (engVoice) utter.voice = engVoice;
+
+  // Play immediately (0ms delay)
+  speechSynthesis.speak(utter);
 }
 
 function toggleAutoPronounce() {
@@ -1076,39 +1054,35 @@ function pronounceModalWord() {
 }
 
 /* ============================================================
-   YOUGLISH INTEGRATION
+   SAME-PAGE YOUGLISH EMBEDDED CONTROLLER
 ============================================================ */
 let ygTabWidget = null;
-
-function onYouglishAPIReady() {
-  try {
-    ygTabWidget = new YG.Widget("youglish-tab-widget", {
-      width: 640,
-      components: 72,
-      events: {
-        'onFetchDone': onYGTabFetchDone
-      }
-    });
-  } catch(e) {
-    console.warn("YouGlish API initialization deferred", e);
-  }
-}
-
-function onYGTabFetchDone(e) {
-  if (e.totalResult === 0) {
-    showToast("No video pronunciation found for this query", "warning");
-  }
-}
 
 function searchYouglishTab() {
   const word = document.getElementById('youglishSearchInput').value.trim();
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
-  
+
+  if (!ygTabWidget && typeof YG !== 'undefined') {
+    try {
+      ygTabWidget = new YG.Widget("youglish-tab-widget", {
+        width: "100%",
+        components: 72,
+        events: {
+          'onFetchDone': function(e) {
+            if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
+          }
+        }
+      });
+    } catch (e) {
+      console.error("YouGlish initialization error:", e);
+    }
+  }
+
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
   } else {
-    window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
+    showToast("YouGlish API loading. Please click 'Watch Clips' again in a moment.", "info");
   }
 }
 
@@ -1117,7 +1091,7 @@ function searchWordInYouglishFromPractice() {
   if (!word) return;
   showTab('youglish');
   document.getElementById('youglishSearchInput').value = word.word;
-  setTimeout(() => searchYouglishTab(), 300);
+  setTimeout(() => searchYouglishTab(), 100);
 }
 
 /* ============================================================
@@ -1128,6 +1102,7 @@ function toggleDark() {
   document.getElementById('darkBtn').textContent = darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
   localStorage.setItem('vocabCoach_dark', darkMode ? '1' : '0');
 }
+
 function loadDarkMode() {
   if (localStorage.getItem('vocabCoach_dark') === '1') {
     darkMode = true; document.body.classList.add('dark');
@@ -1161,6 +1136,7 @@ function showToast(message, type = 'info', duration = 3500) {
   container.appendChild(toast);
   setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => toast.remove(), 300); }, duration);
 }
+
 function logLine(containerId, message, type = 'info') {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -1169,9 +1145,11 @@ function logLine(containerId, message, type = 'info') {
   line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   el.appendChild(line); el.scrollTop = el.scrollHeight;
 }
+
 function clearLog(containerId) {
   if (document.getElementById(containerId)) document.getElementById(containerId).innerHTML = '';
 }
+
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
