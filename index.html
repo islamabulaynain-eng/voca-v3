@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Vocab Recall Coach Pro Max</title>
+<title>Vocab Recall Coach Pro</title>
 
 <!-- SheetJS for Excel Import/Export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -334,7 +334,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 <!-- ===== APP HEADER ===== -->
 <header class="app-header">
-  <div class="app-logo">📚 VocabCoach <span>PRO Max</span></div>
+  <div class="app-logo">📚 VocabCoach <span>PRO</span></div>
   <div class="header-actions">
     <div id="syncIndicator" class="sync-indicator synced" style="display:none;" onclick="forceSync()">🟢 Synced</div>
     <button class="dark-toggle" onclick="toggleDark()" id="darkBtn">🌙 Dark Mode</button>
@@ -569,7 +569,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       </div>
     </div>
   </div>
-  <!-- ========== TAB: VOCABULARY ========== -->
+ <!-- ========== TAB: VOCABULARY ========== -->
   <div class="tab-panel" id="tab-vocabulary">
     
     <!-- Sticky Bulk Action Bar -->
@@ -870,7 +870,7 @@ function getActivityLog() {
 }
 
 /* ============================================================
-   WORD DATA MODEL (UPGRADED FOR CURRICULUM FEATURES)
+   WORD DATA MODEL
 ============================================================ */
 function createWord(data) {
   return {
@@ -884,7 +884,6 @@ function createWord(data) {
     collocations: (data.collocations || []),
     mnemonic: (data.mnemonic || '').trim(),
     
-    // Lexical Deep-Dive Fields
     similarWords: (data.similarWords || []), 
     wordFamily: (data.wordFamily || []),
     confusables: (data.confusables || []),
@@ -939,7 +938,6 @@ function timeAgo(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// FREE SPACED REPETITION SCHEDULER (FSRS v4) IMPLEMENTATION
 function applyFSRS(word, rating) {
   const w = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
   
@@ -1005,7 +1003,7 @@ function getAccuracy(word) {
 }
 
 /* ============================================================
-   INSTANT V1 PRONUNCIATION ENGINE (ZERO NETWORK LAG)
+   PRONUNCIATION ENGINE (FAST LOCAL SPEECH SYNTHESIS)
 ============================================================ */
 function loadPronunciationSettings() {
   const savedAuto = localStorage.getItem('vocabCoach_autoPronounce');
@@ -1017,7 +1015,6 @@ function loadPronunciationSettings() {
 function pronounceWord(text) {
   if (!text || !window.speechSynthesis) return;
 
-  // Instantly cancel any ongoing speech
   speechSynthesis.cancel();
 
   const utter = new SpeechSynthesisUtterance(text);
@@ -1026,13 +1023,11 @@ function pronounceWord(text) {
   utter.pitch = 1.0;
   utter.volume = 1.0;
 
-  // Pick best local voice instantly
   const voices = speechSynthesis.getVoices();
   const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService) || 
                    voices.find(v => v.lang.startsWith('en'));
   if (engVoice) utter.voice = engVoice;
 
-  // Play immediately (0ms delay)
   speechSynthesis.speak(utter);
 }
 
@@ -1054,34 +1049,25 @@ function pronounceModalWord() {
 }
 
 /* ============================================================
-   SAME-PAGE YOUGLISH EMBEDDED CONTROLLER (FIXED)
+   YOUGLISH INTEGRATION (PERFECTED & HYBRID INITIALIZED)
 ============================================================ */
 let ygTabWidget = null;
-let isYouglishReady = false;
 
-// Safe global ready hook called automatically when YouGlish script loads
-window.onYouglishAPIReady = function() {
-  isYouglishReady = true;
-  initYouglishWidget();
-};
-
-function initYouglishWidget() {
-  if (ygTabWidget || typeof YG === 'undefined') return;
+// Official callback triggered by widget.js if loaded asynchronously
+function onYouglishAPIReady() {
+  if (ygTabWidget) return;
   try {
     ygTabWidget = new YG.Widget("youglish-tab-widget", {
-      width: "100%",
+      width: 640,
       components: 72,
       events: {
         'onFetchDone': function(e) {
           if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
-        },
-        'onError': function(e) {
-          console.error("YouGlish Widget error:", e);
         }
       }
     });
-  } catch (e) {
-    console.error("YouGlish initialization error:", e);
+  } catch(e) {
+    console.warn("YouGlish API ready handler error:", e);
   }
 }
 
@@ -1090,14 +1076,29 @@ function searchYouglishTab() {
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
 
-  if (!ygTabWidget && typeof YG !== 'undefined') {
-    initYouglishWidget();
+  // Hybrid Fallback: Attempt lazy instantiation if onYouglishAPIReady didn't trigger
+  if (!ygTabWidget && typeof YG !== 'undefined' && typeof YG.Widget === 'function') {
+    try {
+      ygTabWidget = new YG.Widget("youglish-tab-widget", {
+        width: 640,
+        components: 72,
+        events: {
+          'onFetchDone': function(e) {
+            if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
+          }
+        }
+      });
+    } catch (e) {
+      console.error("YouGlish manual widget initialization error:", e);
+    }
   }
 
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
   } else {
-    showToast("YouGlish API is loading. Please try again in a moment.", "info");
+    // Ultimate Reliable Fallback: Open in secure YouGlish window
+    showToast("Opening clips in YouGlish portal...", "info");
+    window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
   }
 }
 
@@ -1106,7 +1107,7 @@ function searchWordInYouglishFromPractice() {
   if (!word) return;
   showTab('youglish');
   document.getElementById('youglishSearchInput').value = word.word;
-  setTimeout(() => searchYouglishTab(), 150);
+  setTimeout(() => searchYouglishTab(), 200);
 }
 
 /* ============================================================
@@ -1117,16 +1118,14 @@ function toggleDark() {
   document.getElementById('darkBtn').textContent = darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
   localStorage.setItem('vocabCoach_dark', darkMode ? '1' : '0');
 }
-
 function loadDarkMode() {
   if (localStorage.getItem('vocabCoach_dark') === '1') {
     darkMode = true; document.body.classList.add('dark');
     if (document.getElementById('darkBtn')) document.getElementById('darkBtn').textContent = '☀️ Light Mode';
   }
 }
-
-// Automatic YouGlish Video Pause on Tab Navigation
 function showTab(tabName) {
+  // Pause playing video on tab switch
   if (ygTabWidget && typeof ygTabWidget.pause === 'function') {
     try { ygTabWidget.pause(); } catch(e){}
   }
@@ -1141,7 +1140,6 @@ function showTab(tabName) {
   if (tabName === 'vocabulary') renderVocabList();
   if (tabName === 'settings') loadSettingsUI();
 }
-
 function showToast(message, type = 'info', duration = 3500) {
   const container = document.getElementById('toastContainer');
   const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
@@ -1151,7 +1149,6 @@ function showToast(message, type = 'info', duration = 3500) {
   container.appendChild(toast);
   setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => toast.remove(), 300); }, duration);
 }
-
 function logLine(containerId, message, type = 'info') {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -1160,11 +1157,9 @@ function logLine(containerId, message, type = 'info') {
   line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   el.appendChild(line); el.scrollTop = el.scrollHeight;
 }
-
 function clearLog(containerId) {
   if (document.getElementById(containerId)) document.getElementById(containerId).innerHTML = '';
 }
-
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1237,7 +1232,6 @@ function updateDashboard() {
 function loadSettingsUI() {
   document.getElementById('geminiKeyInput').value = localStorage.getItem('vocabCoach_geminiKey') || '';
   document.getElementById('sheetsUrlInput').value = localStorage.getItem('vocabCoach_sheetsUrl') || '';
-  
   document.getElementById('fsrsRetention').value = fsrsSettings.retention || 90;
   document.getElementById('fsrsMaxInterval').value = fsrsSettings.maxInterval || 36500;
   
@@ -1268,8 +1262,7 @@ function clearApiKey() {
 function saveFsrsSettings() {
   fsrsSettings.retention = parseInt(document.getElementById('fsrsRetention').value) || 90;
   fsrsSettings.maxInterval = parseInt(document.getElementById('fsrsMaxInterval').value) || 36500;
-  saveFsrsToStorage();
-  showToast('✅ FSRS settings saved!', 'success');
+  saveFsrsToStorage(); showToast('✅ FSRS settings saved!', 'success');
 }
 function resetFsrsSettings() {
   fsrsSettings = { retention: 90, maxInterval: 36500 };
@@ -1555,7 +1548,7 @@ function renderVocabList() {
 }
 
 /* ============================================================
-   VIEW WORD DETAIL MODAL (W/ LEXICAL CURRICULUM TABLES)
+   VIEW WORD DETAIL MODAL
 ============================================================ */
 function viewWord(id) {
   const w = vocab.find(v => v.id === id);
@@ -1814,7 +1807,7 @@ function practiceOneWord(id) {
 }
 
 /* ============================================================
-   GEMINI AI LOOKUP ENGINE (CURRICULUM SCHEMA)
+   GEMINI AI LOOKUP ENGINE
 ============================================================ */
 const GEMINI_MODEL_BLACKLIST = ['tts', 'vision', 'image', 'embedding', 'embed', 'aqa', 'retrieval', 'answer', 'bison', 'gecko', 'palm', 'code', 'preview', 'exp', 'it-'];
 const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
@@ -2035,7 +2028,7 @@ function loadPracticeWord() {
     let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:12px;">${escHtml(word.meaning)}</div>`;
     if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
     
-    // Complete Interactive Deep-Dive Toggle Buttons on Review Card Back
+    // Interactive Deep-Dive Toggle Buttons on Review Card Back
     backHtml += `
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 12px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
@@ -2043,7 +2036,6 @@ function loadPracticeWord() {
         ${word.confusables && word.confusables.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
         ${word.similarWords && word.similarWords.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('similar')">🔄 Similar</button>` : ''}
         ${word.mnemonic ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('mnemonic')">🧠 Tip</button>` : ''}
-        <button class="btn btn-ghost btn-sm" onclick="searchWordInYouglishFromPractice()">🎬 Video Context</button>
       </div>
       <div id="flashInlineContainer" class="inline-deep-dive" onclick="event.stopPropagation()"></div>`;
     
