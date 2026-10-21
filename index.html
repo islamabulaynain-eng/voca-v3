@@ -196,7 +196,9 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .cloze-blank { font-weight: 800; color: var(--primary); border-bottom: 2px dashed var(--primary); padding: 0 4px; }
 
 .inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
-.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
+
+/* Enforced Height for YouGlish Inline Container (Step 2 Fix) */
+.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
 
 /* ===== MODALS ===== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -2497,4 +2499,4 @@ document.addEventListener('keydown', function(e) {
 })();
 </script>
 </body>
-</html>  
+</html>
