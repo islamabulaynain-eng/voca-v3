@@ -1,3 +1,260 @@
+/**
+ * Vocab Recall Coach Pro - Google Sheets Sync Backend (v2.0 Extended)
+ * Synchronizes all word metadata, FSRS spaced repetition parameters, and activity logs.
+ */
+
+const SHEET_NAMES = {
+  VOCAB: 'Vocabulary',
+  LOG: 'SRS_Log',
+  SESSIONS: 'Sessions',
+  SETTINGS: 'Settings'
+};
+
+function doGet(e) {
+  try {
+    const action = e.parameter.action || 'getAllWords';
+    if (action === 'getAllWords') {
+      const words = getAllWords();
+      return createJsonResponse({ status: 'success', words: words });
+    }
+    return createJsonResponse({ status: 'error', message: 'Unknown GET action' });
+  } catch (error) {
+    return createJsonResponse({ status: 'error', message: error.message });
+  }
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const action = payload.action;
+    const data = payload.data;
+    
+    let result = { status: 'success' };
+    
+    switch (action) {
+      case 'add':
+      case 'addWord':
+        addWord(data);
+        break;
+      case 'update':
+      case 'updateWord':
+        updateWord(data);
+        break;
+      case 'delete':
+      case 'deleteWord':
+        deleteWord(data.id);
+        break;
+      case 'logRating':
+        logRating(data);
+        break;
+      case 'logSession':
+        logSession(data);
+        break;
+      case 'updateSettings':
+        updateSettings(data);
+        break;
+      default:
+        result = { status: 'error', message: 'Unknown POST action: ' + action };
+    }
+    return createJsonResponse(result);
+  } catch (error) {
+    return createJsonResponse({ status: 'error', message: error.message });
+  }
+}
+
+function getAllWords() {
+  const sheet = getSheet(SHEET_NAMES.VOCAB);
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  
+  const words = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    words.push(rowToWord(row));
+  }
+  return words;
+}
+
+function addWord(wordData) {
+  const sheet = getSheet(SHEET_NAMES.VOCAB);
+  const row = wordToRow(wordData);
+  sheet.appendRow(row);
+}
+
+function updateWord(wordData) {
+  const sheet = getSheet(SHEET_NAMES.VOCAB);
+  const rowIndex = findRowIndexById(sheet, wordData.id);
+  
+  if (rowIndex > -1) {
+    const rowData = wordToRow(wordData);
+    sheet.getRange(rowIndex + 1, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    addWord(wordData);
+  }
+}
+
+function deleteWord(id) {
+  if (!id) return;
+  const sheet = getSheet(SHEET_NAMES.VOCAB);
+  const rowIndex = findRowIndexById(sheet, id);
+  if (rowIndex > -1) {
+    sheet.deleteRow(rowIndex + 1);
+  }
+}
+
+function logRating(data) {
+  const sheet = getSheet(SHEET_NAMES.LOG);
+  sheet.appendRow([
+    new Date().toISOString(),
+    data.word || '',
+    data.rating || 0,
+    data.correct || false,
+    data.hints || 0,
+    data.sessionId || ''
+  ]);
+}
+
+function logSession(data) {
+  const sheet = getSheet(SHEET_NAMES.SESSIONS);
+  sheet.appendRow([
+    data.sessionId || '',
+    new Date().toISOString().split('T')[0],
+    data.totalWords || 0,
+    data.correct || 0,
+    data.wrong || 0,
+    data.score || 0,
+    data.accuracy || 0,
+    data.duration || 0,
+    data.hintsUsed || 0
+  ]);
+}
+
+function updateSettings(data) {
+  const sheet = getSheet(SHEET_NAMES.SETTINGS);
+  const key = data.key;
+  const value = data.value;
+  if (!key) return;
+  
+  const values = sheet.getDataRange().getValues();
+  let found = false;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0] === key) {
+      sheet.getRange(i + 1, 2).setValue(String(value));
+      found = true;
+      break;
+    }
+  }
+  if (!found) sheet.appendRow([key, String(value)]);
+}
+
+function wordToRow(w) {
+  return [
+    w.id || '',
+    w.word || '',
+    w.ipa || '',
+    w.meaning || '',
+    w.pos || '',
+    w.definition || '',
+    (w.examples && Array.isArray(w.examples)) ? w.examples.join(' | ') : (w.examples || ''),
+    (w.collocations && Array.isArray(w.collocations)) ? w.collocations.join(' | ') : '',
+    w.mnemonic || '',
+    w.wordAnatomy || '',
+    w.commonMisspellings || '',
+    JSON.stringify(w.similarWords || []),
+    JSON.stringify(w.wordFamily || []),
+    JSON.stringify(w.confusables || []),
+    w.proficiency || 0,
+    w.reviewCount || 0,
+    w.correctCount || 0,
+    w.wrongCount || 0,
+    w.hintsUsed || 0,
+    w.nextReview || '',
+    w.fsrs_S || '',
+    w.fsrs_D || '',
+    w.dateAdded || '',
+    w.lastModified || new Date().toISOString()
+  ];
+}
+
+function rowToWord(r) {
+  return {
+    id: String(r[0]),
+    word: String(r[1]),
+    ipa: String(r[2]),
+    meaning: String(r[3]),
+    pos: String(r[4]),
+    definition: String(r[5]),
+    examples: r[6] ? String(r[6]).split(' | ').filter(e => e.trim()) : [],
+    collocations: r[7] ? String(r[7]).split(' | ').filter(c => c.trim()) : [],
+    mnemonic: String(r[8]),
+    wordAnatomy: String(r[9]),
+    commonMisspellings: String(r[10]),
+    similarWords: r[11] ? parseJsonSafe(r[11]) : [],
+    wordFamily: r[12] ? parseJsonSafe(r[12]) : [],
+    confusables: r[13] ? parseJsonSafe(r[13]) : [],
+    proficiency: parseInt(r[14]) || 0,
+    reviewCount: parseInt(r[15]) || 0,
+    correctCount: parseInt(r[16]) || 0,
+    wrongCount: parseInt(r[17]) || 0,
+    hintsUsed: parseInt(r[18]) || 0,
+    nextReview: String(r[19]),
+    fsrs_S: parseFloat(r[20]) || null,
+    fsrs_D: parseFloat(r[21]) || null,
+    dateAdded: String(r[22]),
+    lastModified: String(r[23])
+  };
+}
+
+function parseJsonSafe(str) {
+  try { return str ? JSON.parse(str) : []; } catch(e) { return []; }
+}
+
+function getSheet(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    setupHeaders(sheet, name);
+  }
+  return sheet;
+}
+
+function findRowIndexById(sheet, id) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) return i;
+  }
+  return -1;
+}
+
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function setupHeaders(sheet, name) {
+  if (name === SHEET_NAMES.VOCAB) {
+    sheet.appendRow([
+      'ID', 'Word', 'IPA', 'Arabic Meaning', 'Part of Speech', 'Definition', 
+      'Examples', 'Collocations', 'Mnemonic', 'Word Anatomy', 'Common Misspellings', 
+      'Similar Words (JSON)', 'Word Family (JSON)', 'Confusables (JSON)', 
+      'Proficiency', 'Review Count', 'Correct Count', 'Wrong Count', 'Hints Used', 
+      'Next Review Date', 'FSRS Stability', 'FSRS Difficulty', 'Date Added', 'Last Modified'
+    ]);
+    sheet.getRange('A1:X1').setFontWeight('bold');
+  } else if (name === SHEET_NAMES.LOG) {
+    sheet.appendRow(['Timestamp', 'Word', 'Rating', 'Was Correct', 'Hints Used', 'Session ID']);
+    sheet.getRange('A1:F1').setFontWeight('bold');
+  } else if (name === SHEET_NAMES.SESSIONS) {
+    sheet.appendRow(['Session ID', 'Date', 'Total Words', 'Correct', 'Wrong', 'Score', 'Accuracy %', 'Duration (sec)', 'Hints Used']);
+    sheet.getRange('A1:I1').setFontWeight('bold');
+  } else if (name === SHEET_NAMES.SETTINGS) {
+    sheet.appendRow(['Key', 'Value']);
+    sheet.getRange('A1:B1').setFontWeight('bold');
+  }
+  sheet.setFrozenRows(1);
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -159,7 +416,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 .word-item:hover .word-item-actions { opacity: 1; }
 .spelling-warning { color: var(--danger); font-size: 12px; font-weight: 700; background: var(--danger-light); padding: 2px 8px; border-radius: 4px; }
 
-/* ===== LEXICAL DEEP-DIVE TABLES & UI ===== */
+/* ===== LEXICAL DEEP-DIVE TABLES ===== */
 .lexical-section { margin-bottom: 20px; background: var(--surface2); border-radius: var(--radius-sm); padding: 16px; border: 1px solid var(--border); }
 .lexical-header { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 
@@ -330,9 +587,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 <!-- ===== MODAL: VIEW WORD DETAIL ===== -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
-    <div id="viewModalContent">
-      <!-- Content injected dynamically via JavaScript -->
-    </div>
+    <div id="viewModalContent"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeViewModal()">Close</button>
       <button class="btn btn-primary" onclick="editFromView()">✏️ Edit</button>
@@ -2041,7 +2296,7 @@ function loadPracticeWord() {
     let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:12px;">${escHtml(word.meaning)}</div>`;
     if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
     
-    // Interactive Deep-Dive Toggle Buttons on Review Card Back
+    // Complete Interactive Deep-Dive Toggle Buttons on Review Card Back
     backHtml += `
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 12px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
@@ -2049,6 +2304,7 @@ function loadPracticeWord() {
         ${word.confusables && word.confusables.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
         ${word.similarWords && word.similarWords.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('similar')">🔄 Similar</button>` : ''}
         ${word.mnemonic ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('mnemonic')">🧠 Tip</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="searchWordInYouglishFromPractice()">🎬 Video Context</button>
       </div>
       <div id="flashInlineContainer" class="inline-deep-dive" onclick="event.stopPropagation()"></div>`;
     
