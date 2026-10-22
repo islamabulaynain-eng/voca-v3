@@ -8,6 +8,8 @@
 <!-- SheetJS for Excel Import/Export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+<!-- Official YouGlish Embedded JS API -->
+<script src="https://youglish.com/public/emb/widget.js" async></script>
 
 <style>
 /* ===== CSS VARIABLES & THEMING ===== */
@@ -121,6 +123,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 .btn-pronounce { background: none; border: none; font-size: 18px; padding: 4px; cursor: pointer; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; transition: var(--transition); }
 .btn-pronounce:hover { background: var(--primary-light); transform: scale(1.1); }
+
 /* ===== FORMS & UTILS ===== */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .form-group { display: flex; flex-direction: column; gap: 8px; }
@@ -194,8 +197,22 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 .inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
 
-/* ===== YOUGLISH CONTAINER ===== */
-.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
+/* ===== YOUGLISH CONTAINER (CLICK-BLOCK FIX) ===== */
+.youglish-wrapper { 
+  width: 100%; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  min-height: 420px; 
+  background: var(--surface2); 
+  border-radius: var(--radius-sm); 
+  border: 1px solid var(--border); 
+  padding: 16px; 
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
 
 /* ===== MODALS ===== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -317,6 +334,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     </div>
   </div>
 </div>
+
 <!-- ===== MODAL: VIEW WORD DETAIL ===== -->
 <div class="modal-overlay" id="viewModal">
   <div class="modal">
@@ -332,7 +350,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 <!-- ===== APP HEADER ===== -->
 <header class="app-header">
-  <div class="app-logo">📚 VocabCoach <span>PRO Max</span></div>
+  <div class="app-logo">📚 VocabCoach <span>PRO</span></div>
   <div class="header-actions">
     <div id="syncIndicator" class="sync-indicator synced" style="display:none;" onclick="forceSync()">🟢 Synced</div>
     <button class="dark-toggle" onclick="toggleDark()" id="darkBtn">🌙 Dark Mode</button>
@@ -567,7 +585,8 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       </div>
     </div>
   </div>
-<!-- ========== TAB: VOCABULARY ========== -->
+
+  <!-- ========== TAB: VOCABULARY ========== -->
   <div class="tab-panel" id="tab-vocabulary">
     
     <!-- Sticky Bulk Action Bar -->
@@ -787,6 +806,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
     </div>
   </div>
 </main>
+
 <script>
 /* ============================================================
    DATA LAYER & STORAGE
@@ -868,7 +888,7 @@ function getActivityLog() {
 }
 
 /* ============================================================
-   WORD DATA MODEL (UPGRADED FOR CURRICULUM FEATURES)
+   WORD DATA MODEL
 ============================================================ */
 function createWord(data) {
   return {
@@ -882,7 +902,6 @@ function createWord(data) {
     collocations: (data.collocations || []),
     mnemonic: (data.mnemonic || '').trim(),
     
-    // Lexical Deep-Dive Fields
     similarWords: (data.similarWords || []), 
     wordFamily: (data.wordFamily || []),
     confusables: (data.confusables || []),
@@ -937,7 +956,6 @@ function timeAgo(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// FREE SPACED REPETITION SCHEDULER (FSRS v4) IMPLEMENTATION
 function applyFSRS(word, rating) {
   const w = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
   
@@ -1003,7 +1021,7 @@ function getAccuracy(word) {
 }
 
 /* ============================================================
-   INSTANT V1 PRONUNCIATION ENGINE (ZERO NETWORK LAG)
+   PRONUNCIATION ENGINE
 ============================================================ */
 function loadPronunciationSettings() {
   const savedAuto = localStorage.getItem('vocabCoach_autoPronounce');
@@ -1015,7 +1033,6 @@ function loadPronunciationSettings() {
 function pronounceWord(text) {
   if (!text || !window.speechSynthesis) return;
 
-  // Instantly cancel any ongoing speech
   speechSynthesis.cancel();
 
   const utter = new SpeechSynthesisUtterance(text);
@@ -1024,13 +1041,11 @@ function pronounceWord(text) {
   utter.pitch = 1.0;
   utter.volume = 1.0;
 
-  // Pick best local voice instantly
   const voices = speechSynthesis.getVoices();
   const engVoice = voices.find(v => v.lang.startsWith('en') && v.localService) || 
                    voices.find(v => v.lang.startsWith('en'));
   if (engVoice) utter.voice = engVoice;
 
-  // Play immediately (0ms delay)
   speechSynthesis.speak(utter);
 }
 
@@ -1051,7 +1066,75 @@ function pronounceModalWord() {
   if (word) pronounceWord(word);
 }
 
-YOUGLISH INTEGRATION
+/* ============================================================
+   YOUGLISH INTEGRATION (SAFE ISOLATED LOADER)
+============================================================ */
+let ygTabWidget = null;
+
+window.onYouglishAPIReady = function() {
+  try {
+    ygTabWidget = new YG.Widget("youglish-tab-widget", {
+      width: "100%",
+      components: 72,
+      events: {
+        'onFetchDone': function(e) {
+          if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
+        }
+      }
+    });
+  } catch(e) {
+    console.warn("YouGlish API widget setup deferred", e);
+  }
+};
+
+function searchYouglishTab() {
+  const word = document.getElementById('youglishSearchInput').value.trim();
+  const accent = document.getElementById('youglishAccentSelect').value;
+  if (!word) return showToast('Please enter a word to search', 'warning');
+
+  const container = document.getElementById('youglish-tab-widget');
+
+  // Direct widget fetch if ready
+  if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
+    ygTabWidget.fetch(word, "english", accent);
+    return;
+  }
+
+  // On-the-fly binding if initialized late
+  if (typeof YG !== 'undefined' && typeof YG.Widget === 'function') {
+    try {
+      container.innerHTML = '';
+      ygTabWidget = new YG.Widget("youglish-tab-widget", {
+        width: "100%",
+        components: 72,
+        events: {
+          'onFetchDone': function(e) {
+            if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
+          }
+        }
+      });
+      setTimeout(() => {
+        if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
+          ygTabWidget.fetch(word, "english", accent);
+        }
+      }, 150);
+      return;
+    } catch(e) {
+      console.error("YG initialization failed", e);
+    }
+  }
+
+  showToast("YouGlish API connecting...", "info");
+}
+
+function searchWordInYouglishFromPractice() {
+  const word = practiceSession.words[practiceSession.index];
+  if (!word) return;
+  showTab('youglish');
+  document.getElementById('youglishSearchInput').value = word.word;
+  setTimeout(() => searchYouglishTab(), 300);
+}
+
 /* ============================================================
    UI UTILITIES
 ============================================================ */
@@ -1068,7 +1151,6 @@ function loadDarkMode() {
   }
 }
 
-// Automatic YouGlish Video Pause on Tab Navigation
 function showTab(tabName) {
   if (ygTabWidget && typeof ygTabWidget.pause === 'function') {
     try { ygTabWidget.pause(); } catch(e){}
@@ -1498,7 +1580,7 @@ function renderVocabList() {
 }
 
 /* ============================================================
-   VIEW WORD DETAIL MODAL (W/ LEXICAL CURRICULUM TABLES)
+   VIEW WORD DETAIL MODAL
 ============================================================ */
 function viewWord(id) {
   const w = vocab.find(v => v.id === id);
@@ -1757,7 +1839,7 @@ function practiceOneWord(id) {
 }
 
 /* ============================================================
-   GEMINI AI LOOKUP ENGINE (CURRICULUM SCHEMA)
+   GEMINI AI LOOKUP ENGINE
 ============================================================ */
 const GEMINI_MODEL_BLACKLIST = ['tts', 'vision', 'image', 'embedding', 'embed', 'aqa', 'retrieval', 'answer', 'bison', 'gecko', 'palm', 'code', 'preview', 'exp', 'it-'];
 const GEMINI_FALLBACK_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
@@ -1974,11 +2056,9 @@ function loadPracticeWord() {
     document.getElementById('flashIpa').textContent = word.ipa || '';
     document.getElementById('flashRatingButtons').style.display = 'none';
     
-    // Interactive Back of Flash Review Card
     let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:12px;">${escHtml(word.meaning)}</div>`;
     if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
     
-    // Complete Interactive Deep-Dive Toggle Buttons on Review Card Back
     backHtml += `
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 12px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
@@ -2024,7 +2104,6 @@ function loadPracticeWord() {
     const input = document.getElementById('practiceInput');
     input.value = ''; input.disabled = false; input.style.borderColor = ''; input.style.background = '';
     
-    // Pre-reveal guidance hints visible, post-reveal deep-dive hidden
     document.getElementById('preRevealHints').style.display = 'flex';
     document.getElementById('postRevealDeepDiveBtns').style.display = 'none';
     document.getElementById('practiceInlineContainer').style.display = 'none';
@@ -2046,7 +2125,6 @@ function flipFlashCard() {
   }
 }
 
-// Inline Toggles for Flash Review Back Card
 function toggleFlashInline(type) {
   const word = practiceSession.words[practiceSession.index];
   const container = document.getElementById('flashInlineContainer');
@@ -2078,7 +2156,6 @@ function toggleFlashInline(type) {
   }
 }
 
-// Inline Toggles for Post-Reveal Active Practice
 function togglePracticeInline(type) {
   const word = practiceSession.words[practiceSession.index];
   const container = document.getElementById('practiceInlineContainer');
@@ -2198,7 +2275,6 @@ function showAnswerFeedback(isCorrect, word, revealed) {
   feedbackEl.style.display = 'block';
   btn.style.display = 'none';
   
-  // Transition to Post-Reveal Deep Dive buttons
   document.getElementById('preRevealHints').style.display = 'none';
   document.getElementById('postRevealDeepDiveBtns').style.display = 'flex';
   document.getElementById('ratingButtons').style.display = 'flex';
@@ -2443,7 +2519,6 @@ document.addEventListener('keydown', function(e) {
   loadFsrsFromStorage();
   loadDarkMode();
   
-  // Pre-load speech voices for instant audio playback
   if (window.speechSynthesis) {
     speechSynthesis.getVoices();
     speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
