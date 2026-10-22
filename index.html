@@ -196,8 +196,8 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
 
 .inline-deep-dive { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 12px; text-align: left; display: none; animation: fadeIn 0.3s ease; }
 
-/* Enforced Height for YouGlish Inline Container */
-.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
+/* ===== YOUGLISH CONTAINER ===== */
+.youglish-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 16px; }
 
 /* ===== MODALS ===== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -1061,16 +1061,20 @@ let ygTabWidget = null;
 function onYouglishAPIReady() {
   try {
     ygTabWidget = new YG.Widget("youglish-tab-widget", {
-      width: "100%",
+      width: 640,
       components: 72,
       events: {
-        'onFetchDone': function(e) {
-          if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
-        }
+        'onFetchDone': onYGTabFetchDone
       }
     });
   } catch(e) {
     console.warn("YouGlish API initialization deferred", e);
+  }
+}
+
+function onYGTabFetchDone(e) {
+  if (e.totalResult === 0) {
+    showToast("No video pronunciation found for this query", "warning");
   }
 }
 
@@ -1079,24 +1083,10 @@ function searchYouglishTab() {
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
   
-  if (!ygTabWidget && typeof YG !== 'undefined' && typeof YG.Widget === 'function') {
-    try {
-      ygTabWidget = new YG.Widget("youglish-tab-widget", {
-        width: "100%",
-        components: 72,
-        events: {
-          'onFetchDone': function(e) {
-            if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
-          }
-        }
-      });
-    } catch(e) {}
-  }
-
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
   } else {
-    showToast("Opening clips in YouGlish portal...", "info");
+    // Fallback if widget script is unreachable or blocked
     window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
   }
 }
@@ -1106,7 +1096,7 @@ function searchWordInYouglishFromPractice() {
   if (!word) return;
   showTab('youglish');
   document.getElementById('youglishSearchInput').value = word.word;
-  setTimeout(() => searchYouglishTab(), 200);
+  setTimeout(() => searchYouglishTab(), 300);
 }
 
 /* ============================================================
