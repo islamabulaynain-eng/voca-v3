@@ -1083,11 +1083,26 @@ function searchYouglishTab() {
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
   
+  // If the widget API is ready, fetch directly
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
-  } else {
-    // Fallback if widget script is unreachable or blocked
-    window.open(`https://youglish.com/pronounce/${encodeURIComponent(word)}/english/${accent}`, '_blank');
+    return;
+  }
+
+  // Fallback: Embed directly into the existing tab container without opening a new window
+  const container = document.getElementById('youglish-tab-widget');
+  if (container) {
+    const accentPath = accent && accent !== 'english' ? `/${accent}` : '';
+    container.innerHTML = `
+      <iframe 
+        id="yg-iframe"
+        width="100%" 
+        height="380" 
+        src="https://youglish.com/5/${encodeURIComponent(word)}${accentPath}/embedded" 
+        frameborder="0" 
+        allow="autoplay; encrypted-media" 
+        allowfullscreen>
+      </iframe>`;
   }
 }
 
