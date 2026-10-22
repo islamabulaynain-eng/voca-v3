@@ -8,8 +8,6 @@
 <!-- SheetJS for Excel Import/Export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<!-- Official YouGlish Embedded JS API -->
-<script src="https://youglish.com/public/emb/widget.js" async></script>
 
 <style>
 /* ===== CSS VARIABLES & THEMING ===== */
@@ -1054,11 +1052,11 @@ function pronounceModalWord() {
 }
 
 /* ============================================================
-   YOUGLISH INTEGRATION (PERMANENT SPA FIX)
+   YOUGLISH INTEGRATION (SYNCHRONIZED LOADER)
 ============================================================ */
 let ygTabWidget = null;
 
-// 1. Register global callback directly on window object
+// 1. Define global hook on window FIRST
 window.onYouglishAPIReady = function() {
   try {
     ygTabWidget = new YG.Widget("youglish-tab-widget", {
@@ -1067,34 +1065,40 @@ window.onYouglishAPIReady = function() {
       events: {
         'onFetchDone': function(e) {
           if (e.totalResult === 0) showToast("No video clips found for this word", "warning");
-        },
-        'onError': function(e) {
-          console.warn("YouGlish Player Error:", e);
         }
       }
     });
   } catch(e) {
-    console.warn("YouGlish API widget setup deferred", e);
+    console.warn("YouGlish widget deferred", e);
   }
 };
 
+// 2. Programmatically load YouGlish script AFTER hook is defined
+(function loadYouglishScript() {
+  if (document.getElementById('youglish-api-script')) return;
+  const script = document.createElement('script');
+  script.id = 'youglish-api-script';
+  script.src = 'https://youglish.com/public/emb/widget.js';
+  script.async = true;
+  document.head.appendChild(script);
+})();
+
+// 3. Search Handler
 function searchYouglishTab() {
   const word = document.getElementById('youglishSearchInput').value.trim();
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
 
-  const container = document.getElementById('youglish-tab-widget');
-
-  // 2. Check if the widget instance exists and is responsive
+  // If widget is instantiated, fetch directly
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
     return;
   }
 
-  // 3. If YG script loaded after page load, manually trigger initialization
+  // Fallback: If script loaded after tab switch, bind widget on-the-fly
   if (typeof YG !== 'undefined' && typeof YG.Widget === 'function') {
     try {
-      container.innerHTML = ''; // Clear freeze placeholder
+      document.getElementById('youglish-tab-widget').innerHTML = '';
       ygTabWidget = new YG.Widget("youglish-tab-widget", {
         width: "100%",
         components: 72,
@@ -1104,20 +1108,18 @@ function searchYouglishTab() {
           }
         }
       });
-      // Fetch after a brief microtask delay for DOM binding
       setTimeout(() => {
         if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
           ygTabWidget.fetch(word, "english", accent);
         }
-      }, 100);
+      }, 150);
       return;
     } catch(e) {
-      console.error("Manual YG initialization failed", e);
+      console.error("On-demand YG initialization failed", e);
     }
   }
 
-  // 4. Fallback if YouGlish external script was blocked/failed to load
-  showToast("YouGlish script is still loading. Retrying...", "info");
+  showToast("YouGlish API is connecting... Please click 'Watch Clips' again.", "info");
 }
 
 function searchWordInYouglishFromPractice() {
