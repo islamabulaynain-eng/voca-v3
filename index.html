@@ -1061,10 +1061,11 @@ let ygTabWidget = null;
 function onYouglishAPIReady() {
   try {
     ygTabWidget = new YG.Widget("youglish-tab-widget", {
-      width: 640,
+      width: "100%",
       components: 72,
       events: {
-        'onFetchDone': onYGTabFetchDone
+        'onFetchDone': onYGTabFetchDone,
+        'onError': onYGTabError
       }
     });
   } catch(e) {
@@ -1078,27 +1079,50 @@ function onYGTabFetchDone(e) {
   }
 }
 
+function onYGTabError(e) {
+  showToast("YouGlish player error. Reloading widget...", "warning");
+  ygTabWidget = null;
+}
+
 function searchYouglishTab() {
   const word = document.getElementById('youglishSearchInput').value.trim();
   const accent = document.getElementById('youglishAccentSelect').value;
   if (!word) return showToast('Please enter a word to search', 'warning');
-  
-  // If the widget API is ready, fetch directly
+
+  const container = document.getElementById('youglish-tab-widget');
+
+  // Re-instantiate widget if destroyed or uninitialized
+  if (!ygTabWidget && typeof YG !== 'undefined' && typeof YG.Widget === 'function') {
+    try {
+      container.innerHTML = ''; // Clean up previous containers
+      ygTabWidget = new YG.Widget("youglish-tab-widget", {
+        width: "100%",
+        components: 72,
+        events: {
+          'onFetchDone': onYGTabFetchDone,
+          'onError': onYGTabError
+        }
+      });
+    } catch(e) {
+      console.error("Failed to re-initialize YouGlish widget", e);
+    }
+  }
+
+  // Primary: Fetch using standard widget API
   if (ygTabWidget && typeof ygTabWidget.fetch === 'function') {
     ygTabWidget.fetch(word, "english", accent);
     return;
   }
 
-  // Fallback: Embed directly into the existing tab container without opening a new window
-  const container = document.getElementById('youglish-tab-widget');
+  // Secondary In-Portal Fallback: Render dynamic YouGlish embedded container
   if (container) {
-    const accentPath = accent && accent !== 'english' ? `/${accent}` : '';
+    const accentQuery = accent && accent !== 'english' ? `&accent=${accent}` : '';
     container.innerHTML = `
       <iframe 
         id="yg-iframe"
         width="100%" 
         height="380" 
-        src="https://youglish.com/5/${encodeURIComponent(word)}${accentPath}/embedded" 
+        src="https://youglish.com/embed/${encodeURIComponent(word)}?lang=english${accentQuery}" 
         frameborder="0" 
         allow="autoplay; encrypted-media" 
         allowfullscreen>
