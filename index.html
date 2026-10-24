@@ -2505,24 +2505,43 @@ async function syncWordToSheets(wordData, actionType) {
 }
 
 // Full library push: Populates the Vocabulary sheet if it is empty
-async function syncAllVocabToSheets() {
-  if (!sheetsUrl || vocab.length === 0) return;
+// Bulk push every local word to Google Sheets
+async function syncAllVocabToSheets(showNotifications = false) {
+  if (!sheetsUrl) {
+    if (showNotifications) showToast('Please configure a Google Sheets URL first', 'warning');
+    return;
+  }
+  if (vocab.length === 0) {
+    if (showNotifications) showToast('No local words to sync', 'info');
+    return;
+  }
+
   setSyncStatus('syncing');
+  if (showNotifications) showToast(`Uploading all ${vocab.length} words to Google Sheets...`, 'info');
+
   try {
     const payload = {
       action: 'syncAll',
       target: 'vocabulary',
       words: vocab.map(formatWordForSheets)
     };
+
     await fetch(sheetsUrl, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    setTimeout(() => setSyncStatus('synced'), 1200);
-  } catch (e) {
+
+    setSyncStatus('synced');
+    if (showNotifications) {
+      showToast(`✅ Successfully pushed ${vocab.length} words to the Vocabulary sheet!`, 'success');
+    }
+  } catch (err) {
     setSyncStatus('failed');
+    if (showNotifications) {
+      showToast('❌ Sync failed. Check network connection or Script URL.', 'error');
+    }
   }
 }
 
