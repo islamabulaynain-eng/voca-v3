@@ -2265,10 +2265,8 @@ function rateWord(rating) {
   if (v) { 
     applyFSRS(v, rating); 
     saveVocab(); 
-    // Push the updated SRS state to Google Sheets
-    if (typeof syncWordToSheets === 'function' && sheetsUrl) {
-      syncWordToSheets(v, 'update');
-    }
+    // Push updated SRS metrics and proficiency to Vocabulary sheet
+    syncWordToSheets(v, 'update');
   }
   saveActivity({ message: `🧠 Practiced "${word.word}" — rated ${['Forgot','Hard','Good','Easy'][rating-1]}` });
   practiceSession.index++;
@@ -2421,12 +2419,13 @@ function resetBulkImport() {
 }
 
 /* ============================================================
-   GOOGLE SHEETS SYNC LOGIC
+   GOOGLE SHEETS SYNC LOGIC (FULL VOCABULARY & LOG SYNC)
 ============================================================ */
 let sheetsUrl = '';
 
 function setSyncStatus(status) {
   const indicator = document.getElementById('syncIndicator');
+  if (!indicator) return;
   if (!sheetsUrl) { indicator.style.display = 'none'; return; }
   indicator.style.display = 'inline-flex'; indicator.className = `sync-indicator ${status}`;
   
@@ -2439,12 +2438,91 @@ function saveSheetsUrl() {
   const url = document.getElementById('sheetsUrlInput').value.trim();
   if (!url) return showToast('Please enter a valid URL', 'warning');
   localStorage.setItem('vocabCoach_sheetsUrl', url);
-  sheetsUrl = url; showToast('Google Sheets URL saved!', 'success'); forceSync();
+  sheetsUrl = url; 
+  showToast('Google Sheets URL saved! Syncing...', 'success'); 
+  syncAllVocabToSheets();
 }
 
 function clearSheetsUrl() {
-  localStorage.removeItem('vocabCoach_sheetsUrl'); sheetsUrl = ''; setSyncStatus('');
-  document.getElementById('sheetsUrlInput').value = ''; showToast('Google Sheets disconnected', 'info');
+  localStorage.removeItem('vocabCoach_sheetsUrl'); 
+  sheetsUrl = ''; 
+  setSyncStatus('');
+  document.getElementById('sheetsUrlInput').value = ''; 
+  showToast('Google Sheets disconnected', 'info');
+}
+
+// Convert word object to flat Google Sheets row representation
+function formatWordForSheets(w) {
+  return {
+    id: w.id,
+    word: w.word || '',
+    ipa: w.ipa || '',
+    meaning: w.meaning || '',
+    pos: w.pos || '',
+    definition: w.definition || '',
+    examples: (w.examples || []).join(' | '),
+    collocations: (w.collocations || []).join(' | '),
+    mnemonic: w.mnemonic || '',
+    similarWordsJSON: JSON.stringify(w.similarWords || []),
+    wordFamilyJSON: JSON.stringify(w.wordFamily || []),
+    confusablesJSON: JSON.stringify(w.confusables || []),
+    wordAnatomy: w.wordAnatomy || '',
+    commonMisspellings: w.commonMisspellings || '',
+    proficiency: Number(w.proficiency) || 0,
+    reviewCount: Number(w.reviewCount) || 0,
+    correctCount: Number(w.correctCount) || 0,
+    wrongCount: Number(w.wrongCount) || 0,
+    hintsUsed: Number(w.hintsUsed) || 0,
+    nextReview: w.nextReview || todayStr(),
+    fsrs_S: w.fsrs_S || '',
+    fsrs_D: w.fsrs_D || '',
+    dateAdded: w.dateAdded || todayStr(),
+    lastModified: w.lastModified || new Date().toISOString()
+  };
+}
+
+// Sync a single word (Add or Update) to Vocabulary sheet
+async function syncWordToSheets(wordData, actionType) {
+  if (!sheetsUrl) return;
+  setSyncStatus('syncing');
+  try {
+    const payload = {
+      action: actionType || 'update',
+      target: 'vocabulary',
+      data: formatWordForSheets(wordData)
+    };
+    await fetch(sheetsUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    setTimeout(() => setSyncStatus('synced'), 800);
+  } catch (err) {
+    setSyncStatus('failed');
+  }
+}
+
+// Full library push: Populates the Vocabulary sheet if it is empty
+async function syncAllVocabToSheets() {
+  if (!sheetsUrl || vocab.length === 0) return;
+  setSyncStatus('syncing');
+  try {
+    const payload = {
+      action: 'syncAll',
+      target: 'vocabulary',
+      words: vocab.map(formatWordForSheets)
+    };
+    await fetch(sheetsUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    setTimeout(() => setSyncStatus('synced'), 1200);
+  } catch (e) {
+    setSyncStatus('failed');
+  }
 }
 
 async function forceSync() {
@@ -2454,77 +2532,55 @@ async function forceSync() {
     const res = await fetch(sheetsUrl + '?action=getAllWords');
     if (res.ok) {
       const data = await res.json();
-      if (data && data.words) {
+      if (data && data.words && data.words.length > 0) {
         let updatedLocal = false;
         data.words.forEach(remoteWord => {
           const localIdx = vocab.findIndex(v => v.id === remoteWord.id);
-          if (localIdx === -1) { vocab.push(remoteWord); updatedLocal = true; } 
-          else {
+          if (localIdx === -1) { 
+            vocab.push(createWord(remoteWord)); 
+            updatedLocal = true; 
+          } else {
             const localTime = new Date(vocab[localIdx].lastModified || 0).getTime();
             const remoteTime = new Date(remoteWord.lastModified || 0).getTime();
-            if (remoteTime > localTime) { vocab[localIdx] = remoteWord; updatedLocal = true; }
+            if (remoteTime > localTime) { 
+              vocab[localIdx] = { ...vocab[localIdx], ...remoteWord }; 
+              updatedLocal = true; 
+            }
           }
         });
-        if (updatedLocal) { localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); renderVocabList(); updateDashboard(); }
+        if (updatedLocal) { 
+          localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); 
+          renderVocabList(); 
+          updateDashboard(); 
+        }
+      } else if (vocab.length > 0) {
+        // If sheet is empty but local client has words, push to sheet
+        syncAllVocabToSheets();
       }
     }
     setSyncStatus('synced');
-  } catch (err) { setSyncStatus('failed'); }
-}
-
-async function syncWordToSheets(wordData, actionType) {
-  if (!sheetsUrl) return;
-  setSyncStatus('syncing');
-  try {
-    // Send full payload including FSRS, metrics, and deep-dive metadata
-    const payload = {
-      action: actionType,
-      data: {
-        id: wordData.id,
-        word: wordData.word,
-        ipa: wordData.ipa || '',
-        meaning: wordData.meaning,
-        pos: wordData.pos || '',
-        definition: wordData.definition || '',
-        examples: wordData.examples || [],
-        collocations: wordData.collocations || [],
-        mnemonic: wordData.mnemonic || '',
-        similarWords: wordData.similarWords || [],
-        wordFamily: wordData.wordFamily || [],
-        confusables: wordData.confusables || [],
-        wordAnatomy: wordData.wordAnatomy || '',
-        commonMisspellings: wordData.commonMisspellings || '',
-        proficiency: wordData.proficiency || 0,
-        reviewCount: wordData.reviewCount || 0,
-        correctCount: wordData.correctCount || 0,
-        wrongCount: wordData.wrongCount || 0,
-        hintsUsed: wordData.hintsUsed || 0,
-        lastRating: wordData.lastRating || null,
-        nextReview: wordData.nextReview,
-        lastReviewDate: wordData.lastReviewDate || null,
-        fsrs_S: wordData.fsrs_S || null,
-        fsrs_D: wordData.fsrs_D || null,
-        dateAdded: wordData.dateAdded,
-        lastModified: wordData.lastModified || new Date().toISOString()
-      }
-    };
-
-    await fetch(sheetsUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    setTimeout(() => setSyncStatus('synced'), 1000);
-  } catch (err) {
-    setSyncStatus('failed');
+  } catch (err) { 
+    setSyncStatus('failed'); 
   }
 }
 
 async function logRatingToSheets(wordData, rating) {
   if (!sheetsUrl) return;
-  try { await fetch(sheetsUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'logRating', data: { word: wordData.word, rating: rating, correct: rating >= 3, hints: wordData.hintsUsed } }) }); } 
-  catch(e) {}
+  try { 
+    await fetch(sheetsUrl, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      body: JSON.stringify({ 
+        action: 'logRating', 
+        data: { 
+          word: wordData.word, 
+          rating: rating, 
+          correct: rating >= 3, 
+          hints: wordData.hintsUsed || 0 
+        } 
+      }) 
+    }); 
+  } catch(e) {}
 }
 
 /* ============================================================
