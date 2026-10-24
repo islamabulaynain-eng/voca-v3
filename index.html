@@ -2262,7 +2262,14 @@ function showAnswerFeedback(isCorrect, word, revealed) {
 function rateWord(rating) {
   const word = practiceSession.words[practiceSession.index];
   const v = vocab.find(v => v.id === word.id);
-  if (v) { applyFSRS(v, rating); saveVocab(); }
+  if (v) { 
+    applyFSRS(v, rating); 
+    saveVocab(); 
+    // Push the updated SRS state to Google Sheets
+    if (typeof syncWordToSheets === 'function' && sheetsUrl) {
+      syncWordToSheets(v, 'update');
+    }
+  }
   saveActivity({ message: `🧠 Practiced "${word.word}" — rated ${['Forgot','Hard','Good','Easy'][rating-1]}` });
   practiceSession.index++;
   if (practiceSession.index >= practiceSession.words.length) endPracticeSession();
@@ -2469,9 +2476,49 @@ async function syncWordToSheets(wordData, actionType) {
   if (!sheetsUrl) return;
   setSyncStatus('syncing');
   try {
-    await fetch(sheetsUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionType, data: wordData }) });
+    // Send full payload including FSRS, metrics, and deep-dive metadata
+    const payload = {
+      action: actionType,
+      data: {
+        id: wordData.id,
+        word: wordData.word,
+        ipa: wordData.ipa || '',
+        meaning: wordData.meaning,
+        pos: wordData.pos || '',
+        definition: wordData.definition || '',
+        examples: wordData.examples || [],
+        collocations: wordData.collocations || [],
+        mnemonic: wordData.mnemonic || '',
+        similarWords: wordData.similarWords || [],
+        wordFamily: wordData.wordFamily || [],
+        confusables: wordData.confusables || [],
+        wordAnatomy: wordData.wordAnatomy || '',
+        commonMisspellings: wordData.commonMisspellings || '',
+        proficiency: wordData.proficiency || 0,
+        reviewCount: wordData.reviewCount || 0,
+        correctCount: wordData.correctCount || 0,
+        wrongCount: wordData.wrongCount || 0,
+        hintsUsed: wordData.hintsUsed || 0,
+        lastRating: wordData.lastRating || null,
+        nextReview: wordData.nextReview,
+        lastReviewDate: wordData.lastReviewDate || null,
+        fsrs_S: wordData.fsrs_S || null,
+        fsrs_D: wordData.fsrs_D || null,
+        dateAdded: wordData.dateAdded,
+        lastModified: wordData.lastModified || new Date().toISOString()
+      }
+    };
+
+    await fetch(sheetsUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
     setTimeout(() => setSyncStatus('synced'), 1000);
-  } catch (err) { setSyncStatus('failed'); }
+  } catch (err) {
+    setSyncStatus('failed');
+  }
 }
 
 async function logRatingToSheets(wordData, rating) {
