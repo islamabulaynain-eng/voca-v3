@@ -732,6 +732,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
       <div class="form-actions">
         <button class="btn btn-success" onclick="saveSheetsUrl()">💾 Save URL & Sync</button>
         <button class="btn btn-primary" onclick="syncAllVocabToSheets(true)">⬆️ Push All Words to Sheets</button>
+        <button class="btn btn-warning" onclick="syncAllLogsToSheets(true)">📜 Push Historical Logs</button>
         <button class="btn btn-danger btn-sm" onclick="clearSheetsUrl()">🗑️ Disconnect</button>
       </div>
     </div>
@@ -2541,6 +2542,62 @@ async function syncAllVocabToSheets(showNotifications = false) {
     setSyncStatus('failed');
     if (showNotifications) {
       showToast('❌ Sync failed. Check network connection or Script URL.', 'error');
+    }
+  }
+}
+// Extracts all historical review records across words and pushes them to SRS_Log
+async function syncAllLogsToSheets(showNotifications = false) {
+  if (!sheetsUrl) {
+    if (showNotifications) showToast('Please configure a Google Sheets URL first', 'warning');
+    return;
+  }
+
+  // Compile all history items into a flat list of log entries
+  const allLogs = [];
+  vocab.forEach(w => {
+    if (Array.isArray(w.history) && w.history.length > 0) {
+      w.history.forEach(h => {
+        allLogs.push({
+          timestamp: h.date || w.dateAdded || todayStr(),
+          word: w.word,
+          rating: h.rating,
+          correct: Number(h.rating) >= 3,
+          hints: w.hintsUsed || 0
+        });
+      });
+    }
+  });
+
+  if (allLogs.length === 0) {
+    if (showNotifications) showToast('No historical rating logs found locally', 'info');
+    return;
+  }
+
+  setSyncStatus('syncing');
+  if (showNotifications) showToast(`Uploading ${allLogs.length} historical logs...`, 'info');
+
+  try {
+    const payload = {
+      action: 'syncAllLogs',
+      target: 'srs_log',
+      logs: allLogs
+    };
+
+    await fetch(sheetsUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    setSyncStatus('synced');
+    if (showNotifications) {
+      showToast(`✅ Successfully pushed ${allLogs.length} historical logs to SRS_Log!`, 'success');
+    }
+  } catch (err) {
+    setSyncStatus('failed');
+    if (showNotifications) {
+      showToast('❌ Failed to upload logs. Check network connection.', 'error');
     }
   }
 }
