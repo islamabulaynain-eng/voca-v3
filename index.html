@@ -2028,7 +2028,7 @@ function loadPracticeWord() {
   const total = session.words.length;
   const current = session.index + 1;
   
-  if (session.mode === 'flash') {
+if (session.mode === 'flash') {
     document.getElementById('flashProgress').textContent = `Word ${current} of ${total}`;
     document.getElementById('flashProgressBar').style.width = Math.round(((current - 1) / total) * 100) + '%';
     document.getElementById('flashCardInner').classList.remove('flipped');
@@ -2036,12 +2036,44 @@ function loadPracticeWord() {
     document.getElementById('flashIpa').textContent = word.ipa || '';
     document.getElementById('flashRatingButtons').style.display = 'none';
     
-// Complete Interactive Back of Flash Review Card (Shows All Metadata)
-    let backHtml = `<div style="font-size:24px; font-weight:800; color:var(--primary); margin-bottom:12px;">${escHtml(word.meaning)}</div>`;
-    if (word.definition) backHtml += `<div style="font-size:14px; margin-bottom:16px;">${escHtml(word.definition)}</div>`;
+    // --- Card Back Header ---
+    let backHtml = `
+      <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:12px;" onclick="event.stopPropagation()">
+        <span style="font-size:26px; font-weight:800; color:var(--primary);">${escHtml(word.meaning)}</span>
+        <button class="btn-pronounce" onclick="pronounceWord('${escHtml(word.word).replace(/'/g, "\\'")}')" title="Pronounce">🔊</button>
+      </div>`;
     
+    if (word.definition) {
+      backHtml += `<div style="font-size:14px; color:var(--text); line-height:1.5; margin-bottom:14px; text-align:center;">${escHtml(word.definition)}</div>`;
+    }
+
+    // --- Example Sentences Block (Always Rendered on Back) ---
+    if (word.examples && word.examples.length > 0) {
+      backHtml += `
+        <div style="width:100%; margin-bottom:14px; text-align:left;" onclick="event.stopPropagation()">
+          <div style="font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase; margin-bottom:6px;">💬 Example Sentences:</div>
+          ${word.examples.map(ex => `
+            <div style="background:var(--surface); border-left:3px solid var(--primary); padding:8px 12px; border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin-bottom:6px; font-style:italic; font-size:13px; line-height:1.4;">
+              "${escHtml(ex)}"
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    // --- Collocations Tag List ---
+    if (word.collocations && word.collocations.length > 0) {
+      backHtml += `
+        <div style="width:100%; margin-bottom:14px; text-align:left;" onclick="event.stopPropagation()">
+          <div style="font-size:12px; font-weight:700; color:var(--text2); text-transform:uppercase; margin-bottom:4px;">🔗 Collocations:</div>
+          <div class="tag-list" style="margin-top:2px;">
+            ${word.collocations.map(c => `<span class="tag" style="font-size:12px; padding:3px 10px;">${escHtml(c)}</span>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    // --- Interactive Deep Dive Buttons ---
     backHtml += `
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 12px 0; justify-content:center;" onclick="event.stopPropagation()">
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 10px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
         ${(word.wordFamily && word.wordFamily.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('family')">🌳 Word Family</button>` : ''}
         ${(word.confusables && word.confusables.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
@@ -2052,8 +2084,8 @@ function loadPracticeWord() {
       <div id="flashInlineContainer" class="inline-deep-dive" onclick="event.stopPropagation()"></div>`;
     
     document.getElementById('flashBackContent').innerHTML = backHtml;
-    
-  } else {
+  }
+  else {
     document.getElementById('practiceProgress').textContent = `Word ${current} of ${total}`;
     document.getElementById('practiceProgressBar').style.width = Math.round(((current - 1) / total) * 100) + '%';
     document.getElementById('practiceSessionScore').textContent = `Score: ${session.score}`;
@@ -2106,6 +2138,7 @@ function flipFlashCard() {
   }
 }
 
+// Shows ALL similar words and formatted metadata tables inside Flash Review
 function toggleFlashInline(type) {
   const word = practiceSession.words[practiceSession.index];
   const container = document.getElementById('flashInlineContainer');
@@ -2119,15 +2152,55 @@ function toggleFlashInline(type) {
 
   let html = '';
   if (type === 'anatomy' && word.wordAnatomy) {
-    html = `<strong>🧩 Anatomy:</strong> <span style="font-family:monospace;">${escHtml(word.wordAnatomy)}</span>`;
+    html = `<div style="font-size:13px;"><strong>🧩 Morphology / Anatomy:</strong> <span style="font-family:monospace; color:var(--primary);">${escHtml(word.wordAnatomy)}</span></div>`;
   } else if (type === 'family' && word.wordFamily && word.wordFamily.length > 0) {
-    html = `<strong>🌳 Word Family:</strong><br>` + word.wordFamily.map(f => `${escHtml(f.pos)}: <strong>${escHtml(f.word)}</strong> (${escHtml(f.meaning)})`).join('<br>');
+    html = `
+      <div style="font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px;">🌳 WORD FAMILY:</div>
+      <table class="compare-table table-info" style="font-size:12px;">
+        <thead><tr><th>POS</th><th>Word</th><th>Meaning</th></tr></thead>
+        <tbody>
+          ${word.wordFamily.map(f => `
+            <tr>
+              <td>${escHtml(f.pos)}</td>
+              <td style="color:var(--primary); font-weight:700;">${escHtml(f.word)}</td>
+              <td style="direction:rtl; text-align:right;">${escHtml(f.meaning)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
   } else if (type === 'confusables' && word.confusables && word.confusables.length > 0) {
-    html = `<strong style="color:var(--danger);">⚠️ Watch Out:</strong> Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em>`;
+    html = `
+      <div style="font-size:12px; font-weight:700; color:var(--danger); margin-bottom:6px;">⚠️ COMMONLY CONFUSED WITH:</div>
+      <table class="compare-table table-danger" style="font-size:12px;">
+        <thead><tr><th>Word</th><th>Meaning</th><th>Nuance</th></tr></thead>
+        <tbody>
+          ${word.confusables.map(c => `
+            <tr>
+              <td style="color:var(--danger); font-weight:800;">${escHtml(c.word)}</td>
+              <td style="direction:rtl; text-align:right;">${escHtml(c.meaning)}</td>
+              <td>${escHtml(c.reason)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
   } else if (type === 'similar' && word.similarWords && word.similarWords.length > 0) {
-    html = `<strong>🔄 Similar:</strong> <strong>${escHtml(word.similarWords[0].word)}</strong> (${escHtml(word.similarWords[0].meaning)})<br><em>${escHtml(word.similarWords[0].usage_difference)}</em>`;
+    // Maps across ALL similar words instead of truncating at [0]
+    html = `
+      <div style="font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px;">🔄 SIMILAR WORDS & USAGE NUANCES:</div>
+      <table class="compare-table" style="font-size:12px;">
+        <thead><tr><th>Word</th><th>Meaning</th><th>Usage Difference</th></tr></thead>
+        <tbody>
+          ${word.similarWords.map(sim => `
+            <tr>
+              <td style="color:var(--primary); font-weight:700;">${escHtml(sim.word)}</td>
+              <td style="direction:rtl; text-align:right;">${escHtml(sim.meaning)}</td>
+              <td>${escHtml(sim.usage_difference)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
   } else if (type === 'mnemonic' && word.mnemonic) {
-    html = `<strong>🧠 Memory Tip:</strong> 💡 ${escHtml(word.mnemonic)}`;
+    html = `<div style="font-size:13px; color:var(--warning); font-weight:600;">🧠 <strong>Memory Hook:</strong> ${escHtml(word.mnemonic)}</div>`;
   }
 
   if (html) {
