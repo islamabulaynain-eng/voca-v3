@@ -1632,7 +1632,24 @@ function viewWord(id) {
         </table>
       </div>`;
   }
-
+if (w.phrasalVerbs && Array.isArray(w.phrasalVerbs) && w.phrasalVerbs.length > 0) {
+    html += `
+      <div class="lexical-section">
+        <div class="lexical-header">🔗 Phrasal Verbs & Expressions</div>
+        <table class="compare-table table-info" style="table-layout: fixed;">
+          <thead><tr><th style="width:30%;">Phrase</th><th style="width:30%;">Meaning</th><th style="width:40%;">Example</th></tr></thead>
+          <tbody>
+            ${w.phrasalVerbs.map(pv => `
+              <tr>
+                <td style="font-weight:700; color:var(--primary); word-wrap:break-word;">${escHtml(pv.phrase)}</td>
+                <td style="direction:rtl; text-align:right; word-wrap:break-word;">${escHtml(pv.meaning)}</td>
+                <td style="font-style:italic; font-size:13px; line-height:1.4; word-wrap:break-word;">"${escHtml(pv.example)}"</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
   if (w.similarWords && Array.isArray(w.similarWords) && w.similarWords.length > 0) {
     html += `
       <div class="lexical-section">
@@ -1698,7 +1715,14 @@ function editFromView() { closeViewModal(); if (viewingWordId) openEditWordModal
    ADD / EDIT WORD MODAL & AI LOGIC
 ============================================================ */
 function openAddWordModal() {
-  editingWordId = null; currentCollocations = []; currentSimilarWords = []; currentWordFamily = []; currentConfusables = []; currentWordAnatomy = ""; currentMisspellings = "";
+  editingWordId = null; 
+  currentCollocations = []; 
+  currentSimilarWords = []; 
+  currentWordFamily = []; 
+  currentConfusables = []; 
+  currentPhrasalVerbs = []; // <-- تصفير عند الإضافة
+  currentWordAnatomy = ""; 
+  currentMisspellings = "";
   document.getElementById('wordModalTitle').textContent = '➕ Add New Word';
   document.getElementById('mPronounceBtn').style.display = 'none';
   clearWordForm();
@@ -1715,6 +1739,7 @@ function openEditWordModal(id) {
   currentSimilarWords = (w.similarWords) ? [...w.similarWords] : [];
   currentWordFamily = (w.wordFamily) ? [...w.wordFamily] : [];
   currentConfusables = (w.confusables) ? [...w.confusables] : [];
+  currentPhrasalVerbs = (w.phrasalVerbs) ? [...w.phrasalVerbs] : []; // <-- تحميل المحفوظ
   currentWordAnatomy = w.wordAnatomy || "";
   currentMisspellings = w.commonMisspellings || "";
   
@@ -1734,8 +1759,16 @@ function openEditWordModal(id) {
   document.getElementById('wordModal').classList.add('open');
 }
 
-function closeWordModal() { document.getElementById('wordModal').classList.remove('open'); editingWordId = null; currentCollocations = []; currentSimilarWords = []; currentWordFamily = []; currentConfusables = []; }
-function clearWordForm() {
+function closeWordModal() { 
+  document.getElementById('wordModal').classList.remove('open'); 
+  editingWordId = null; 
+  currentCollocations = []; 
+  currentSimilarWords = []; 
+  currentWordFamily = []; 
+  currentConfusables = []; 
+  currentPhrasalVerbs = []; // <-- تصفير عند الإغلاق
+}
+  function clearWordForm() {
   ['mWord','mIpa','mMeaning','mDefinition','mExamples','mMnemonic','mCollocInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('mPos').value = '';
   renderCollocTags();
@@ -1778,6 +1811,7 @@ function saveWord() {
     pos: document.getElementById('mPos').value.trim(), definition: document.getElementById('mDefinition').value.trim(),
     examples, collocations: [...currentCollocations], mnemonic: document.getElementById('mMnemonic').value.trim(),
     similarWords: [...currentSimilarWords], wordFamily: [...currentWordFamily], confusables: [...currentConfusables],
+    phrasalVerbs: [...currentPhrasalVerbs], // <-- تم إضافتها هنا
     wordAnatomy: currentWordAnatomy, commonMisspellings: currentMisspellings,
     lastModified: new Date().toISOString()
   };
@@ -1799,7 +1833,6 @@ function saveWord() {
   
   saveVocab(); closeWordModal(); renderVocabList(); updateDashboard();
 }
-
 function deleteWord(id) {
   const w = vocab.find(v => v.id === id);
   if (!w) return;
