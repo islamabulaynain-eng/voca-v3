@@ -1561,7 +1561,8 @@ function renderVocabList() {
         </div>
         <div class="word-item-actions">
           <button class="btn btn-ghost btn-icon" onclick="viewWord('${w.id}')" title="View Details">👁️</button>
-          <button class="btn btn-ghost btn-icon" onclick="practiceOneWord('${w.id}')" title="Quick Practice">🧠</button>
+          <button class="btn btn-ghost btn-icon" onclick="reviewOneWord('${w.id}')" title="Quick Flash Review">⚡</button>
+          <button class="btn btn-ghost btn-icon" onclick="practiceOneWord('${w.id}')" title="Quick Typing Practice">🧠</button>
           <button class="btn btn-ghost btn-icon" onclick="openEditWordModal('${w.id}')" title="Edit">✏️</button>
         </div>
       </div>`;
@@ -1843,11 +1844,18 @@ function deleteWord(id) {
   const w = vocab.find(v => v.id === id);
   if (!w) return;
   if (!confirm(`Delete "${w.word}" from your library?`)) return;
+  
+  // Push delete action to Google Sheets immediately
+  if (typeof syncWordToSheets === 'function' && sheetsUrl) {
+    syncWordToSheets({ id: w.id, word: w.word }, 'delete');
+  }
+
   vocab = vocab.filter(v => v.id !== id);
-  saveVocab(); renderVocabList(); updateDashboard();
+  saveVocab(); 
+  renderVocabList(); 
+  updateDashboard();
   showToast(`🗑️ "${w.word}" deleted`, 'info');
   saveActivity({ message: `🗑️ Deleted word: "${w.word}"` });
-  if (typeof syncWordToSheets === 'function') syncWordToSheets({ id }, 'delete');
 }
 
 function practiceOneWord(id) {
@@ -1861,7 +1869,17 @@ function practiceOneWord(id) {
   document.getElementById('practiceSessionCard').style.display = 'block';
   loadPracticeWord();
 }
-
+function reviewOneWord(id) {
+  const w = vocab.find(v => v.id === id);
+  if (!w) return;
+  practiceSession = { words: [w], index: 0, score: 0, hintsUsed: 0, correct: 0, wrong: 0, mode: 'flash' };
+  showTab('practice');
+  document.getElementById('practiceSetupCard').style.display = 'none';
+  document.getElementById('practiceCompleteCard').style.display = 'none';
+  document.getElementById('practiceSessionCard').style.display = 'none';
+  document.getElementById('flashReviewCard').style.display = 'block';
+  loadPracticeWord();
+}
 /* ============================================================
    GEMINI AI LOOKUP ENGINE
 ============================================================ */
