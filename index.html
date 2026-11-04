@@ -2514,8 +2514,8 @@ function saveSheetsUrl() {
   if (!url) return showToast('Please enter a valid URL', 'warning');
   localStorage.setItem('vocabCoach_sheetsUrl', url);
   sheetsUrl = url; 
-  showToast('Google Sheets URL saved! Syncing...', 'success'); 
-  syncAllVocabToSheets();
+  showToast('Google Sheets URL saved! Pulling data...', 'info'); 
+  forceSync(true); // نمرر true ليقوم بالسحب الإجباري فوراً
 }
 
 function clearSheetsUrl() {
@@ -2675,42 +2675,44 @@ async function syncAllLogsToSheets(showNotifications = false) {
   }
 }
 
-async function forceSync() {
+async function forceSync(notify = false) {
   if (!sheetsUrl) return;
   setSyncStatus('syncing');
   try {
     const res = await fetch(sheetsUrl + '?action=getAllWords');
     if (res.ok) {
       const data = await res.json();
-      if (data && data.words && data.words.length > 0) {
-        let updatedLocal = false;
-        data.words.forEach(remoteWord => {
-          const localIdx = vocab.findIndex(v => v.id === remoteWord.id);
-          if (localIdx === -1) { 
-            vocab.push(createWord(remoteWord)); 
-            updatedLocal = true; 
-          } else {
-            const localTime = new Date(vocab[localIdx].lastModified || 0).getTime();
-            const remoteTime = new Date(remoteWord.lastModified || 0).getTime();
-            if (remoteTime > localTime) { 
-              vocab[localIdx] = { ...vocab[localIdx], ...remoteWord }; 
-              updatedLocal = true; 
+      if (data && data.words && Array.isArray(data.words)) {
+        
+        // إذا كان الموبايل فارغاً تماماً، يسحب كل الكلمات مباشرة
+        if (vocab.length === 0) {
+          vocab = data.words.map(remoteWord => createWord(remoteWord));
+        } else {
+          // دمج الكلمات الذكي في حال وجود كلمات على الجهازين
+          data.words.forEach(remoteWord => {
+            const localIdx = vocab.findIndex(v => v.id === remoteWord.id || v.word.toLowerCase() === remoteWord.word.toLowerCase());
+            if (localIdx === -1) {
+              vocab.push(createWord(remoteWord));
+            } else {
+              const localTime = new Date(vocab[localIdx].lastModified || 0).getTime();
+              const remoteTime = new Date(remoteWord.lastModified || 0).getTime();
+              if (remoteTime >= localTime) {
+                vocab[localIdx] = { ...vocab[localIdx], ...createWord(remoteWord) };
+              }
             }
-          }
-        });
-        if (updatedLocal) { 
-          localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); 
-          renderVocabList(); 
-          updateDashboard(); 
+          });
         }
-      } else if (vocab.length > 0) {
-        // If sheet is empty but local client has words, push to sheet
-        syncAllVocabToSheets();
+
+        saveVocab();
+        renderVocabList();
+        updateDashboard();
+        if (notify) showToast(`✅ تم سحب ${vocab.length} كلمة بنجاح!`, 'success');
       }
     }
     setSyncStatus('synced');
-  } catch (err) { 
-    setSyncStatus('failed'); 
+  } catch (err) {
+    setSyncStatus('failed');
+    if (notify) showToast('❌ فشل السحب من الشيت، تأكد من الاتصال', 'error');
   }
 }
 
