@@ -1815,27 +1815,29 @@ function saveWord() {
     pos: document.getElementById('mPos').value.trim(), definition: document.getElementById('mDefinition').value.trim(),
     examples, collocations: [...currentCollocations], mnemonic: document.getElementById('mMnemonic').value.trim(),
     similarWords: [...currentSimilarWords], wordFamily: [...currentWordFamily], confusables: [...currentConfusables],
-    phrasalVerbs: [...currentPhrasalVerbs], // <-- تم إضافتها هنا
+    phrasalVerbs: Array.isArray(currentPhrasalVerbs) ? [...currentPhrasalVerbs] : [],
     wordAnatomy: currentWordAnatomy, commonMisspellings: currentMisspellings,
     lastModified: new Date().toISOString()
   };
   
-  if (editingWordId) {
-    const idx = vocab.findIndex(v => v.id === editingWordId);
-    if (idx !== -1) {
-      vocab[idx] = { ...vocab[idx], ...wordData };
-      showToast(`✅ "${word}" updated!`, 'success');
-      if (typeof syncWordToSheets === 'function') syncWordToSheets(vocab[idx], 'update');
-    }
+  const existingIdx = vocab.findIndex(v => (editingWordId && v.id === editingWordId) || v.word.toLowerCase() === word.toLowerCase());
+  
+  if (existingIdx !== -1) {
+    // تحديث الكلمة وبياناتها ومصطلحاتها الجديدة بدلاً من الرفض
+    vocab[existingIdx] = { ...vocab[existingIdx], ...wordData };
+    showToast(`✅ "${word}" updated with new data!`, 'success');
+    if (typeof syncWordToSheets === 'function') syncWordToSheets(vocab[existingIdx], 'update');
   } else {
-    if (vocab.find(v => v.word.toLowerCase() === word.toLowerCase())) return showToast(`⚠️ "${word}" already exists`, 'warning');
     const newWord = createWord(wordData);
     vocab.push(newWord);
     showToast(`✅ "${word}" added!`, 'success');
     if (typeof syncWordToSheets === 'function') syncWordToSheets(newWord, 'add');
   }
   
-  saveVocab(); closeWordModal(); renderVocabList(); updateDashboard();
+  saveVocab(); 
+  closeWordModal(); 
+  renderVocabList(); 
+  updateDashboard();
 }
 function deleteWord(id) {
   const w = vocab.find(v => v.id === id);
@@ -2307,10 +2309,13 @@ function togglePracticeInline(type) {
     html = `<strong style="color:var(--danger);">⚠️ Watch Out:</strong> Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em>`;
   } else if (type === 'similar' && word.similarWords && word.similarWords.length > 0) {
     html = `<strong>🔄 Similar Words:</strong><br>` + word.similarWords.map(s => `<strong>${escHtml(s.word)}</strong> (${escHtml(s.meaning)}): ${escHtml(s.usage_difference)}`).join('<br>');
-  } else if (type === 'phrasal' && word.phrasalVerbs && word.phrasalVerbs.length > 0) {
-    html = `<strong>🔗 Phrasal Verbs & Expressions:</strong><br>` + word.phrasalVerbs.map(pv => `• <strong>${escHtml(pv.phrase)}</strong>: ${escHtml(pv.meaning)} <em style="color:var(--text2); font-size:12px;">("${escHtml(pv.example)}")</em>`).join('<br>');
+  } else if (type === 'phrasal') {
+    if (word.phrasalVerbs && word.phrasalVerbs.length > 0) {
+      html = `<strong>🔗 Phrasal Verbs & Expressions:</strong><br>` + word.phrasalVerbs.map(pv => `• <strong>${escHtml(pv.phrase)}</strong>: ${escHtml(pv.meaning)} <em style="color:var(--text2); font-size:12px;">("${escHtml(pv.example)}")</em>`).join('<br>');
+    } else {
+      html = `<strong>🔗 Phrasal Verbs:</strong><br><span style="color:var(--text2); font-size:13px;">No phrasal verbs recorded for this word. Re-run AI lookup to generate them.</span>`;
+    }
   }
-
   if (html) {
     container.innerHTML = html;
     container.style.display = 'block';
