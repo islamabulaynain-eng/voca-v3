@@ -520,6 +520,7 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
         <div id="postRevealDeepDiveBtns" class="hint-buttons" style="display:none;">
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('anatomy')">🧩 Anatomy</button>
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('family')">🌳 Word Family</button>
+          <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('phrasal')">🔗 Phrasal Verbs</button>
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('confusables')">⚠️ Watch Out</button>
           <button class="btn btn-ghost btn-sm" onclick="togglePracticeInline('similar')">🔄 Similar Words</button>
           <button class="btn btn-ghost btn-sm" onclick="searchWordInYouglishFromPractice()">🎬 Video Context</button>
@@ -823,6 +824,7 @@ let currentWordFamily = [];
 let currentConfusables = [];
 let currentWordAnatomy = "";
 let currentMisspellings = "";
+let currentPhrasalVerbs = [];
 
 let editingWordId = null;
 let viewingWordId = null;
@@ -909,7 +911,8 @@ function createWord(data) {
     confusables: (data.confusables || []),
     wordAnatomy: (data.wordAnatomy || '').trim(),
     commonMisspellings: (data.commonMisspellings || '').trim(),
-
+    phrasalVerbs: (data.phrasalVerbs || []),
+    
     dateAdded: data.dateAdded || todayStr(),
     nextReview: data.nextReview || todayStr(),
     proficiency: data.proficiency || 0,
@@ -1855,9 +1858,10 @@ async function callGemini(apiKey, prompt, logId) {
       wordAnatomy: { type: "STRING" }, commonMisspellings: { type: "STRING" },
       wordFamily: { type: "ARRAY", items: { type: "OBJECT", properties: { pos: { type: "STRING" }, word: { type: "STRING" }, meaning: { type: "STRING" } }, required: ["pos", "word", "meaning"] } },
       confusables: { type: "ARRAY", items: { type: "OBJECT", properties: { word: { type: "STRING" }, meaning: { type: "STRING" }, reason: { type: "STRING" } }, required: ["word", "meaning", "reason"] } },
-      similarWords: { type: "ARRAY", items: { type: "OBJECT", properties: { word: { type: "STRING" }, meaning: { type: "STRING" }, usage_difference: { type: "STRING" } }, required: ["word", "meaning", "usage_difference"] } }
+      similarWords: { type: "ARRAY", items: { type: "OBJECT", properties: { word: { type: "STRING" }, meaning: { type: "STRING" }, usage_difference: { type: "STRING" } }, required: ["word", "meaning", "usage_difference"] } },
+      phrasalVerbs: { type: "ARRAY", items: { type: "OBJECT", properties: { phrase: { type: "STRING" }, meaning: { type: "STRING" }, example: { type: "STRING" }}, required: ["phrase", "meaning", "example"] } }
     },
-    required: ["word", "ipa", "pos", "meaning", "definition", "examples", "collocations", "mnemonic", "wordAnatomy", "commonMisspellings", "wordFamily", "confusables", "similarWords"]
+    required: ["word", "ipa", "pos", "meaning", "definition", "examples", "collocations", "mnemonic", "wordAnatomy", "commonMisspellings", "wordFamily", "confusables", "similarWords", "phrasalVerbs"]
   };
 
   for (let model of models) {
@@ -1877,7 +1881,7 @@ async function callGemini(apiKey, prompt, logId) {
 }
 
 function buildLookupPrompt(word) {
-  return `You are an expert linguistics curriculum designer. Generate comprehensive lexical metadata for the English word: "${word}". Include its morphology (word anatomy), derivations (word family), dangerous confusables (false friends/similar looking words), common misspellings, synonyms with usage nuances, and Arabic translations. Return accurate data strictly conforming to the schema.`;
+  return `You are an expert linguistics curriculum designer. Generate comprehensive lexical metadata for the English word: "${word}". Include its morphology (word anatomy), derivations (word family), phrasal verbs / combinations with prepositions and particles (e.g. if the word is 'look', include 'look up', 'look for', 'look after' with Arabic meanings and an example), dangerous confusables, common misspellings, synonyms with usage nuances, and Arabic translations. Return accurate data strictly conforming to the schema.`;
 }
 
 async function lookupWithFallback(word, logId) {
@@ -1953,6 +1957,7 @@ async function triggerLookup(bulkWord = null) {
   if (result.pos)        document.getElementById(prefix+'Pos').value        = result.pos;
   if (result.definition) document.getElementById(prefix+'Definition').value = result.definition;
   if (result.mnemonic)   document.getElementById(prefix+'Mnemonic').value   = result.mnemonic;
+  if (result.phrasalVerbs) currentPhrasalVerbs = result.phrasalVerbs;
   
   if (result.similarWords) currentSimilarWords = result.similarWords;
   if (result.wordFamily) currentWordFamily = result.wordFamily;
@@ -2076,13 +2081,13 @@ if (session.mode === 'flash') {
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 10px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
         ${(word.wordFamily && word.wordFamily.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('family')">🌳 Word Family</button>` : ''}
+        ${(word.phrasalVerbs && word.phrasalVerbs.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('phrasal')">🔗 Phrasal Verbs</button>` : ''}
         ${(word.confusables && word.confusables.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
         ${(word.similarWords && word.similarWords.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('similar')">🔄 Similar Words</button>` : ''}
         ${word.mnemonic ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('mnemonic')">🧠 Memory Tip</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="searchWordInYouglishFromPractice()">🎬 Video Context</button>
       </div>
       <div id="flashInlineContainer" class="inline-deep-dive" onclick="event.stopPropagation()"></div>`;
-    
     document.getElementById('flashBackContent').innerHTML = backHtml;
   }
   else {
@@ -2199,6 +2204,21 @@ function toggleFlashInline(type) {
           `).join('')}
         </tbody>
       </table>`;
+  } else if (type === 'phrasal' && word.phrasalVerbs && word.phrasalVerbs.length > 0) {
+  html = `
+    <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:6px;">🔗 PHRASAL VERBS & COMBINATIONS:</div>
+    <table class="compare-table table-info" style="font-size:12px; table-layout: fixed;">
+      <thead><tr><th style="width:35%;">Phrase</th><th style="width:30%;">Meaning</th><th style="width:35%;">Example</th></tr></thead>
+      <tbody>
+        ${word.phrasalVerbs.map(pv => `
+          <tr>
+            <td style="color:var(--primary); font-weight:800;">${escHtml(pv.phrase)}</td>
+            <td style="direction:rtl; text-align:right;">${escHtml(pv.meaning)}</td>
+            <td style="font-style:italic; font-size:11px;">"${escHtml(pv.example)}"</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
   } else if (type === 'mnemonic' && word.mnemonic) {
     html = `<div style="font-size:13px; color:var(--warning); font-weight:600;">🧠 <strong>Memory Hook:</strong> ${escHtml(word.mnemonic)}</div>`;
   }
@@ -2230,6 +2250,8 @@ function togglePracticeInline(type) {
     html = `<strong style="color:var(--danger);">⚠️ Watch Out:</strong> Confused with <strong>${escHtml(word.confusables[0].word)}</strong> (${escHtml(word.confusables[0].meaning)}).<br><em>${escHtml(word.confusables[0].reason)}</em>`;
   } else if (type === 'similar' && word.similarWords && word.similarWords.length > 0) {
     html = `<strong>🔄 Similar Words:</strong><br>` + word.similarWords.map(s => `<strong>${escHtml(s.word)}</strong> (${escHtml(s.meaning)}): ${escHtml(s.usage_difference)}`).join('<br>');
+  } else if (type === 'phrasal' && word.phrasalVerbs && word.phrasalVerbs.length > 0) {
+    html = `<strong>🔗 Phrasal Verbs & Expressions:</strong><br>` + word.phrasalVerbs.map(pv => `• <strong>${escHtml(pv.phrase)}</strong>: ${escHtml(pv.meaning)} <em style="color:var(--text2); font-size:12px;">("${escHtml(pv.example)}")</em>`).join('<br>');
   }
 
   if (html) {
@@ -2457,6 +2479,7 @@ function confirmBulkWord() {
     examples: document.getElementById('bExamples').value.split('\n').filter(e => e.trim()),
     collocations: [], mnemonic: document.getElementById('bMnemonic').value.trim(),
     similarWords: [...currentSimilarWords], wordFamily: [...currentWordFamily], confusables: [...currentConfusables],
+    phrasalVerbs: [...currentPhrasalVerbs],
     wordAnatomy: currentWordAnatomy, commonMisspellings: currentMisspellings, lastModified: new Date().toISOString()
   };
   
