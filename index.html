@@ -1331,6 +1331,7 @@ function exportExcel() {
       ConfusablesJSON: JSON.stringify(w.confusables || []),
       WordAnatomy: w.wordAnatomy || '', CommonMisspellings: w.commonMisspellings || '',
       Proficiency: w.proficiency, ReviewCount: w.reviewCount, CorrectCount: w.correctCount,
+      PhrasalVerbsJSON: JSON.stringify(w.phrasalVerbs || []),
       WrongCount: w.wrongCount, HintsUsed: w.hintsUsed || 0, NextReviewDate: w.nextReview,
       FSRS_S: w.fsrs_S || '', FSRS_D: w.fsrs_D || '', 
       DateAdded: w.dateAdded, LastModified: w.lastModified || new Date().toISOString()
@@ -1368,6 +1369,7 @@ function importExcel(event) {
             confusables: row.ConfusablesJSON ? JSON.parse(row.ConfusablesJSON) : [],
             wordAnatomy: row.WordAnatomy || '', commonMisspellings: row.CommonMisspellings || '',
             proficiency: parseInt(row.Proficiency) || 0, reviewCount: parseInt(row.ReviewCount) || 0,
+            phrasalVerbs: row.PhrasalVerbsJSON ? JSON.parse(row.PhrasalVerbsJSON) : [],
             correctCount: parseInt(row.CorrectCount) || 0, wrongCount: parseInt(row.WrongCount) || 0,
             hintsUsed: parseInt(row.HintsUsed) || 0, nextReview: row.NextReviewDate, 
             fsrs_S: parseFloat(row.FSRS_S) || null, fsrs_D: parseFloat(row.FSRS_D) || null,
@@ -2566,6 +2568,7 @@ function formatWordForSheets(w) {
     confusablesJSON: JSON.stringify(w.confusables || []),
     wordAnatomy: w.wordAnatomy || '',
     commonMisspellings: w.commonMisspellings || '',
+    phrasalVerbsJSON: JSON.stringify(w.phrasalVerbs || []),
     proficiency: Number(w.proficiency) || 0,
     reviewCount: Number(w.reviewCount) || 0,
     correctCount: Number(w.correctCount) || 0,
