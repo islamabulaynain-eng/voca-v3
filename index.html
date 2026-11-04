@@ -323,6 +323,10 @@ button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding
         <label class="form-label">Mnemonic / Memory Tip</label>
         <textarea id="mMnemonic" placeholder="e.g. AMBIguous = AMBI means both sides..."></textarea>
       </div>
+      <div class="form-group full" id="mPhrasalGroup" style="display:none;">
+        <label class="form-label">🔗 Phrasal Verbs Detected by AI</label>
+        <div id="mPhrasalPreview" style="background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px; font-size:13px; max-height:120px; overflow-y:auto;"></div>
+      </div>
     </div>
     <div id="lookupStatus" style="display:none; margin-top:16px;">
       <div class="log-window" id="lookupLog"></div>
@@ -1993,6 +1997,20 @@ async function triggerLookup(bulkWord = null) {
   if (result.definition) document.getElementById(prefix+'Definition').value = result.definition;
   if (result.mnemonic)   document.getElementById(prefix+'Mnemonic').value   = result.mnemonic;
   if (result.phrasalVerbs) currentPhrasalVerbs = result.phrasalVerbs;
+  // عرض المعاينة فوراً في نافذة الإضافة
+  const phrasalGroup = document.getElementById('mPhrasalGroup');
+  const phrasalPreview = document.getElementById('mPhrasalPreview');
+  if (phrasalGroup && phrasalPreview) {
+    if (currentPhrasalVerbs && currentPhrasalVerbs.length > 0) {
+      phrasalGroup.style.display = 'block';
+      phrasalPreview.innerHTML = currentPhrasalVerbs.map(pv => 
+        `<div style="margin-bottom:4px;">• <strong style="color:var(--primary);">${escHtml(pv.phrase)}</strong>: ${escHtml(pv.meaning)} <em style="color:var(--text2); font-size:11px;">("${escHtml(pv.example)}")</em></div>`
+      ).join('');
+    } else {
+      phrasalGroup.style.display = 'none';
+      phrasalPreview.innerHTML = '';
+    }
+  }
   
   if (result.similarWords) currentSimilarWords = result.similarWords;
   if (result.wordFamily) currentWordFamily = result.wordFamily;
@@ -2116,7 +2134,7 @@ if (session.mode === 'flash') {
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin: 10px 0; justify-content:center;" onclick="event.stopPropagation()">
         ${word.wordAnatomy ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('anatomy')">🧩 Anatomy</button>` : ''}
         ${(word.wordFamily && word.wordFamily.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('family')">🌳 Word Family</button>` : ''}
-        ${(word.phrasalVerbs && word.phrasalVerbs.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('phrasal')">🔗 Phrasal Verbs</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('phrasal')">🔗 Phrasal Verbs ${word.phrasalVerbs && word.phrasalVerbs.length ? `(${word.phrasalVerbs.length})` : ''}</button>
         ${(word.confusables && word.confusables.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('confusables')">⚠️ Watch Out</button>` : ''}
         ${(word.similarWords && word.similarWords.length > 0) ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('similar')">🔄 Similar Words</button>` : ''}
         ${word.mnemonic ? `<button class="btn btn-ghost btn-sm" onclick="toggleFlashInline('mnemonic')">🧠 Memory Tip</button>` : ''}
@@ -2239,21 +2257,25 @@ function toggleFlashInline(type) {
           `).join('')}
         </tbody>
       </table>`;
-  } else if (type === 'phrasal' && word.phrasalVerbs && word.phrasalVerbs.length > 0) {
-  html = `
-    <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:6px;">🔗 PHRASAL VERBS & COMBINATIONS:</div>
-    <table class="compare-table table-info" style="font-size:12px; table-layout: fixed;">
-      <thead><tr><th style="width:35%;">Phrase</th><th style="width:30%;">Meaning</th><th style="width:35%;">Example</th></tr></thead>
-      <tbody>
-        ${word.phrasalVerbs.map(pv => `
-          <tr>
-            <td style="color:var(--primary); font-weight:800;">${escHtml(pv.phrase)}</td>
-            <td style="direction:rtl; text-align:right;">${escHtml(pv.meaning)}</td>
-            <td style="font-style:italic; font-size:11px;">"${escHtml(pv.example)}"</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>`;
+} else if (type === 'phrasal') {
+    if (word.phrasalVerbs && word.phrasalVerbs.length > 0) {
+      html = `
+        <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:6px;">🔗 PHRASAL VERBS & COMBINATIONS:</div>
+        <table class="compare-table table-info" style="font-size:12px; width:100%;">
+          <thead><tr><th style="width:30%;">Phrase</th><th style="width:30%;">Meaning</th><th style="width:40%;">Example</th></tr></thead>
+          <tbody>
+            ${word.phrasalVerbs.map(pv => `
+              <tr>
+                <td style="color:var(--primary); font-weight:800;">${escHtml(pv.phrase)}</td>
+                <td style="direction:rtl; text-align:right;">${escHtml(pv.meaning)}</td>
+                <td style="font-style:italic; font-size:11px; line-height:1.4;">"${escHtml(pv.example)}"</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } else {
+      html = `<div style="padding:10px; color:var(--text2); font-size:13px; text-align:center;">ℹ️ No phrasal verbs recorded for this word. Re-run AI lookup to generate them.</div>`;
+    }
   } else if (type === 'mnemonic' && word.mnemonic) {
     html = `<div style="font-size:13px; color:var(--warning); font-weight:600;">🧠 <strong>Memory Hook:</strong> ${escHtml(word.mnemonic)}</div>`;
   }
