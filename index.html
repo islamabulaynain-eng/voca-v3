@@ -843,7 +843,6 @@ let pronounceSpeed = 0.85;
 function saveVocab() {
   try { 
     localStorage.setItem('vocabCoach_words', JSON.stringify(vocab)); 
-    if (typeof forceSync === 'function' && sheetsUrl) forceSync();
   } catch(e) { showToast('Storage error: ' + e.message, 'error'); }
 }
 
@@ -1744,7 +1743,7 @@ function openEditWordModal(id) {
   currentSimilarWords = (w.similarWords) ? [...w.similarWords] : [];
   currentWordFamily = (w.wordFamily) ? [...w.wordFamily] : [];
   currentConfusables = (w.confusables) ? [...w.confusables] : [];
-  currentPhrasalVerbs = (w.phrasalVerbs) ? [...w.phrasalVerbs] : []; // <-- تحميل المحفوظ
+  currentPhrasalVerbs = (w.phrasalVerbs && Array.isArray(w.phrasalVerbs)) ? [...w.phrasalVerbs] : [];
   currentWordAnatomy = w.wordAnatomy || "";
   currentMisspellings = w.commonMisspellings || "";
   
@@ -1760,6 +1759,20 @@ function openEditWordModal(id) {
   document.getElementById('mMnemonic').value = w.mnemonic || '';
   renderCollocTags();
   
+  // إظهار المعاينة إن كانت موجودة مسبقاً
+  const phrasalGroup = document.getElementById('mPhrasalGroup');
+  const phrasalPreview = document.getElementById('mPhrasalPreview');
+  if (phrasalGroup && phrasalPreview) {
+    if (currentPhrasalVerbs.length > 0) {
+      phrasalGroup.style.display = 'block';
+      phrasalPreview.innerHTML = currentPhrasalVerbs.map(pv => 
+        `<div style="margin-bottom:4px;">• <strong style="color:var(--primary);">${escHtml(pv.phrase)}</strong>: ${escHtml(pv.meaning)} <em style="color:var(--text2); font-size:11px;">("${escHtml(pv.example)}")</em></div>`
+      ).join('');
+    } else {
+      phrasalGroup.style.display = 'none';
+    }
+  }
+
   document.getElementById('lookupStatus').style.display = 'none';
   document.getElementById('wordModal').classList.add('open');
 }
@@ -1840,22 +1853,43 @@ function saveWord() {
   renderVocabList(); 
   updateDashboard();
 }
-function deleteWord(id) {
+async function deleteWord(id) {
   const w = vocab.find(v => v.id === id);
   if (!w) return;
   if (!confirm(`Delete "${w.word}" from your library?`)) return;
   
-  // Push delete action to Google Sheets immediately
-  if (typeof syncWordToSheets === 'function' && sheetsUrl) {
-    syncWordToSheets({ id: w.id, word: w.word }, 'delete');
-  }
+  const wordName = w.word;
+  const wordId = w.id;
 
+  // 1. احذف من الواجهة والذاكرة المحلية أولاً
   vocab = vocab.filter(v => v.id !== id);
   saveVocab(); 
   renderVocabList(); 
   updateDashboard();
-  showToast(`🗑️ "${w.word}" deleted`, 'info');
-  saveActivity({ message: `🗑️ Deleted word: "${w.word}"` });
+  showToast(`🗑️ "${wordName}" deleted locally...`, 'info');
+
+  // 2. أرسل أمر الحذف للشيت
+  if (sheetsUrl) {
+    setSyncStatus('syncing');
+    try {
+      await fetch(sheetsUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          id: wordId,
+          word: wordName
+        })
+      });
+      setTimeout(() => setSyncStatus('synced'), 1000);
+      showToast(`✅ "${wordName}" deleted from Google Sheets!`, 'success');
+    } catch(err) {
+      setSyncStatus('failed');
+      console.error("Delete sync failed", err);
+    }
+  }
+  saveActivity({ message: `🗑️ Deleted word: "${wordName}"` });
 }
 
 function practiceOneWord(id) {
@@ -2668,7 +2702,9 @@ async function syncWordToSheets(wordData, actionType) {
     const payload = {
       action: actionType || 'update',
       target: 'vocabulary',
-      data: formatWordForSheets(wordData)
+      data: formatWordForSheets(wordData),
+      id: wordData.id,
+      word: wordData.word
     };
     await fetch(sheetsUrl, {
       method: 'POST',
